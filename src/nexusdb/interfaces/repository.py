@@ -15,7 +15,8 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from collections.abc import Mapping, Sequence
-from typing import Any, Generic, TypeVar
+from enum import StrEnum
+from typing import Any, Generic, TypeAlias, TypeVar
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -32,13 +33,66 @@ class SortSpec(BaseModel):
     descending: bool = False
 
 
+class Operator(StrEnum):
+    """Comparison operators a :class:`FieldFilter` can express.
+
+    Adapters translate each member to their own query language; a backend
+    that cannot express a given operator raises ``UnsupportedOperationError``
+    rather than silently degrading to a different comparison.
+    """
+
+    EQ = "eq"
+    NE = "ne"
+    GT = "gt"
+    GTE = "gte"
+    LT = "lt"
+    LTE = "lte"
+    IN = "in_"
+    NOT_IN = "not_in"
+    CONTAINS = "contains"
+    IS_NULL = "is_null"
+
+
+class FieldFilter(BaseModel):
+    """One ``field OP value`` comparison; a :class:`Specification` ANDs a sequence of these."""
+
+    model_config = ConfigDict(frozen=True)
+
+    field: str
+    operator: Operator = Operator.EQ
+    value: Any = None
+
+
+Specification: TypeAlias = Sequence[FieldFilter]
+"""An implicit AND of :class:`FieldFilter`; the richer alternative to a plain equality mapping."""
+
+
+def _normalize_criteria(criteria: Mapping[str, Any] | Specification | None) -> list[FieldFilter]:
+    """Turn either accepted ``criteria`` shape into a uniform list adapters can translate.
+
+    A plain mapping is sugar for a list of ``eq`` filters, kept for backward compatibility
+    with callers written before :class:`Specification` existed.
+    """
+
+    if criteria is None:
+        return []
+    if isinstance(criteria, Mapping):
+        return [
+            FieldFilter(field=key, operator=Operator.EQ, value=value)
+            for key, value in criteria.items()
+        ]
+    return list(criteria)
+
+
 class Page(BaseModel, Generic[TModel]):
     """A page of results plus enough metadata to fetch the next one."""
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
     items: list[TModel]
-    total: int | None = Field(default=None, description="Total matches, if the backend computed it cheaply")
+    total: int | None = Field(
+        default=None, description="Total matches, if the backend computed it cheaply"
+    )
     limit: int
     offset: int
 
@@ -104,19 +158,18 @@ class AbstractRepository(ABC, Generic[TModel, TId]):
     @abstractmethod
     async def find(
         self,
-        criteria: Mapping[str, Any] | None = None,
+        criteria: Mapping[str, Any] | Specification | None = None,
         *,
         limit: int = 50,
         offset: int = 0,
         sort: Sequence[SortSpec] | None = None,
     ) -> Page[TModel]:
-        """Query by an equality-filter mapping (adapters may extend with richer operators)."""
+        """Query by a plain equality mapping or a richer :class:`Specification` of filters."""
 
     @abstractmethod
-    async def count(self, criteria: Mapping[str, Any] | None = None) -> int:
-        ...
+    async def count(self, criteria: Mapping[str, Any] | Specification | None = None) -> int: ...
 
-    async def exists(self, criteria: Mapping[str, Any] | None = None) -> bool:
+    async def exists(self, criteria: Mapping[str, Any] | Specification | None = None) -> bool:
         return await self.count(criteria) > 0
 
     # -- bulk operations --------------------------------------------------------
@@ -124,16 +177,24 @@ class AbstractRepository(ABC, Generic[TModel, TId]):
     @abstractmethod
     async def bulk_create(
         self, entities: Sequence[TModel], *, idempotency_key: str | None = None
-    ) -> BulkResult[TModel]:
-        ...
+    ) -> BulkResult[TModel]: ...
 
     @abstractmethod
-    async def bulk_update(self, updates: Mapping[TId, Mapping[str, Any]]) -> BulkResult[TModel]:
-        ...
+    async def bulk_update(self, updates: Mapping[TId, Mapping[str, Any]]) -> BulkResult[TModel]: ...
 
     @abstractmethod
     async def bulk_delete(self, ids: Sequence[TId]) -> int:
         """Returns the number of records actually deleted."""
 
 
-__all__ = ["AbstractRepository", "BulkResult", "Page", "SortSpec", "TId", "TModel"]
+__all__ = [
+    "AbstractRepository",
+    "BulkResult",
+    "FieldFilter",
+    "Operator",
+    "Page",
+    "Specification",
+    "SortSpec",
+    "TId",
+    "TModel",
+]

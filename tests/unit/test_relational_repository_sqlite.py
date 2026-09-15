@@ -22,7 +22,12 @@ from sqlalchemy import Column, DateTime, Integer, MetaData, String, Table, Uuid
 from nexusdb.adapters.relational.sqlite import SQLiteAdapter
 from nexusdb.core.config import ConnectionConfig, NodeConfig
 from nexusdb.core.enums import DatabaseKind, RoutingRole
-from nexusdb.core.exceptions import DuplicateRecordError, RecordNotFoundError
+from nexusdb.core.exceptions import (
+    DuplicateRecordError,
+    RecordNotFoundError,
+    UnsupportedOperationError,
+)
+from nexusdb.interfaces.repository import FieldFilter, Operator
 from nexusdb.models.base import Entity
 from nexusdb.repositories.relational_repository import SQLAlchemyRepository
 from nexusdb.uow.sqlalchemy_uow import SQLAlchemyUnitOfWork
@@ -89,7 +94,9 @@ async def test_unique_constraint_violation_maps_to_duplicate_record_error(
         await widget_sql_repo.create(Widget(name="dup", quantity=2))
 
 
-async def test_update_missing_row_raises_record_not_found(widget_sql_repo: SQLAlchemyRepository) -> None:
+async def test_update_missing_row_raises_record_not_found(
+    widget_sql_repo: SQLAlchemyRepository,
+) -> None:
     with pytest.raises(RecordNotFoundError):
         await widget_sql_repo.update(uuid.uuid4(), {"quantity": 5})
 
@@ -104,7 +111,9 @@ async def test_update_persists_changes(widget_sql_repo: SQLAlchemyRepository) ->
     assert refetched.quantity == 42
 
 
-async def test_delete_is_committed_immediately_outside_a_uow(widget_sql_repo: SQLAlchemyRepository) -> None:
+async def test_delete_is_committed_immediately_outside_a_uow(
+    widget_sql_repo: SQLAlchemyRepository,
+) -> None:
     widget = await widget_sql_repo.create(Widget(name="deleteme", quantity=1))
 
     assert await widget_sql_repo.delete(widget.id) is True
@@ -147,6 +156,133 @@ async def test_find_with_criteria_and_pagination(widget_sql_repo: SQLAlchemyRepo
     assert page.has_more is True
 
 
+async def test_find_with_plain_dict_criteria_is_still_supported(
+    widget_sql_repo: SQLAlchemyRepository,
+) -> None:
+    await widget_sql_repo.create(Widget(name="dict-alpha", quantity=1))
+    await widget_sql_repo.create(Widget(name="dict-beta", quantity=2))
+
+    page = await widget_sql_repo.find({"quantity": 2})
+
+    assert page.total == 1
+    assert page.items[0].name == "dict-beta"
+
+
+async def test_find_with_ne_operator(widget_sql_repo: SQLAlchemyRepository) -> None:
+    await widget_sql_repo.create(Widget(name="ne-a", quantity=1))
+    await widget_sql_repo.create(Widget(name="ne-b", quantity=2))
+
+    page = await widget_sql_repo.find(
+        [FieldFilter(field="quantity", operator=Operator.NE, value=1)]
+    )
+
+    assert page.total == 1
+    assert page.items[0].name == "ne-b"
+
+
+async def test_find_with_gt_and_lte_operators(widget_sql_repo: SQLAlchemyRepository) -> None:
+    for i in range(5):
+        await widget_sql_repo.create(Widget(name=f"range-{i}", quantity=i))
+
+    gt_page = await widget_sql_repo.find(
+        [FieldFilter(field="quantity", operator=Operator.GT, value=2)]
+    )
+    lte_page = await widget_sql_repo.find(
+        [FieldFilter(field="quantity", operator=Operator.LTE, value=2)]
+    )
+
+    assert {w.quantity for w in gt_page.items} == {3, 4}
+    assert {w.quantity for w in lte_page.items} == {0, 1, 2}
+
+
+async def test_find_with_gte_and_lt_operators(widget_sql_repo: SQLAlchemyRepository) -> None:
+    for i in range(5):
+        await widget_sql_repo.create(Widget(name=f"range2-{i}", quantity=i))
+
+    gte_page = await widget_sql_repo.find(
+        [FieldFilter(field="quantity", operator=Operator.GTE, value=3)]
+    )
+    lt_page = await widget_sql_repo.find(
+        [FieldFilter(field="quantity", operator=Operator.LT, value=1)]
+    )
+
+    assert {w.quantity for w in gte_page.items} == {3, 4}
+    assert {w.quantity for w in lt_page.items} == {0}
+
+
+async def test_find_with_in_and_not_in_operators(widget_sql_repo: SQLAlchemyRepository) -> None:
+    for i in range(4):
+        await widget_sql_repo.create(Widget(name=f"in-{i}", quantity=i))
+
+    in_page = await widget_sql_repo.find(
+        [FieldFilter(field="quantity", operator=Operator.IN, value=[0, 2])]
+    )
+    not_in_page = await widget_sql_repo.find(
+        [FieldFilter(field="quantity", operator=Operator.NOT_IN, value=[0, 2])]
+    )
+
+    assert {w.quantity for w in in_page.items} == {0, 2}
+    assert {w.quantity for w in not_in_page.items} == {1, 3}
+
+
+async def test_find_with_contains_operator(widget_sql_repo: SQLAlchemyRepository) -> None:
+    await widget_sql_repo.create(Widget(name="banana-split", quantity=1))
+    await widget_sql_repo.create(Widget(name="apple-pie", quantity=1))
+
+    page = await widget_sql_repo.find(
+        [FieldFilter(field="name", operator=Operator.CONTAINS, value="split")]
+    )
+
+    assert page.total == 1
+    assert page.items[0].name == "banana-split"
+
+
+async def test_find_with_is_null_operator(widget_sql_repo: SQLAlchemyRepository) -> None:
+    await widget_sql_repo.create(Widget(name="tenant-none", quantity=1, tenant_id=None))
+    await widget_sql_repo.create(Widget(name="tenant-set", quantity=1, tenant_id="acme"))
+
+    null_page = await widget_sql_repo.find(
+        [FieldFilter(field="tenant_id", operator=Operator.IS_NULL, value=True)]
+    )
+    not_null_page = await widget_sql_repo.find(
+        [FieldFilter(field="tenant_id", operator=Operator.IS_NULL, value=False)]
+    )
+
+    assert null_page.total == 1
+    assert null_page.items[0].name == "tenant-none"
+    assert not_null_page.total == 1
+    assert not_null_page.items[0].name == "tenant-set"
+
+
+async def test_count_with_operator_filters(widget_sql_repo: SQLAlchemyRepository) -> None:
+    for i in range(3):
+        await widget_sql_repo.create(Widget(name=f"count-{i}", quantity=i))
+
+    total = await widget_sql_repo.count(
+        [FieldFilter(field="quantity", operator=Operator.GTE, value=1)]
+    )
+
+    assert total == 2
+
+
+async def test_exists_with_operator_filters(widget_sql_repo: SQLAlchemyRepository) -> None:
+    await widget_sql_repo.create(Widget(name="exists-check", quantity=5))
+
+    assert await widget_sql_repo.exists(
+        [FieldFilter(field="quantity", operator=Operator.GT, value=4)]
+    )
+    assert not await widget_sql_repo.exists(
+        [FieldFilter(field="quantity", operator=Operator.GT, value=100)]
+    )
+
+
+async def test_find_raises_for_unsupported_operator(widget_sql_repo: SQLAlchemyRepository) -> None:
+    bogus_filter = FieldFilter.model_construct(field="quantity", operator="bogus", value=1)
+
+    with pytest.raises(UnsupportedOperationError):
+        await widget_sql_repo.find([bogus_filter])
+
+
 async def test_uow_commit_persists_changes(sqlite_adapter: SQLiteAdapter, widget_sql_repo) -> None:
     widget = Widget(name="committed", quantity=1)
 
@@ -157,7 +293,9 @@ async def test_uow_commit_persists_changes(sqlite_adapter: SQLiteAdapter, widget
     assert await widget_sql_repo.get_by_id(widget.id) is not None
 
 
-async def test_uow_rollback_discards_changes(sqlite_adapter: SQLiteAdapter, widget_sql_repo) -> None:
+async def test_uow_rollback_discards_changes(
+    sqlite_adapter: SQLiteAdapter, widget_sql_repo
+) -> None:
     widget = Widget(name="rolledback", quantity=1)
 
     async with SQLAlchemyUnitOfWork(sqlite_adapter) as uow:
@@ -167,7 +305,9 @@ async def test_uow_rollback_discards_changes(sqlite_adapter: SQLiteAdapter, widg
     assert await widget_sql_repo.get_by_id(widget.id) is None
 
 
-async def test_uow_implicit_rollback_on_exception(sqlite_adapter: SQLiteAdapter, widget_sql_repo) -> None:
+async def test_uow_implicit_rollback_on_exception(
+    sqlite_adapter: SQLiteAdapter, widget_sql_repo
+) -> None:
     widget = Widget(name="exploded", quantity=1)
 
     with pytest.raises(ValueError):

@@ -12,7 +12,8 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nexusdb.core.exceptions import RecordNotFoundError
+from nexusdb.core.exceptions import RecordNotFoundError, UnsupportedOperationError
+from nexusdb.interfaces.repository import FieldFilter, Operator
 from nexusdb.models.base import Entity
 from nexusdb.repositories.vector_repository import QdrantRepository
 
@@ -144,6 +145,92 @@ async def test_find_returns_page_built_from_scroll_and_count(repo, mock_client):
     assert len(page.items) == 2
 
 
+async def test_find_with_plain_dict_criteria_builds_match_value_filter(repo, mock_client):
+    await repo.find(criteria={"name": "alpha"})
+
+    _, kwargs = mock_client.scroll.call_args
+    condition = kwargs["scroll_filter"].must[0]
+    assert condition.key == "name"
+    assert condition.match.value == "alpha"
+
+
+async def test_find_with_ne_operator_builds_match_except_filter(repo, mock_client):
+    await repo.find(criteria=[FieldFilter(field="name", operator=Operator.NE, value="alpha")])
+
+    _, kwargs = mock_client.scroll.call_args
+    condition = kwargs["scroll_filter"].must[0]
+    assert condition.key == "name"
+    assert condition.match.except_ == ["alpha"]
+
+
+async def test_find_with_gt_and_lte_operators_build_range_filters(repo, mock_client):
+    await repo.find(
+        criteria=[
+            FieldFilter(field="quantity", operator=Operator.GT, value=1),
+            FieldFilter(field="quantity", operator=Operator.LTE, value=5),
+        ]
+    )
+
+    _, kwargs = mock_client.scroll.call_args
+    conditions = kwargs["scroll_filter"].must
+    assert conditions[0].range.gt == 1
+    assert conditions[1].range.lte == 5
+
+
+async def test_find_with_in_operator_builds_match_any_filter(repo, mock_client):
+    await repo.find(criteria=[FieldFilter(field="quantity", operator=Operator.IN, value=[1, 2])])
+
+    _, kwargs = mock_client.scroll.call_args
+    condition = kwargs["scroll_filter"].must[0]
+    assert condition.match.any == [1, 2]
+
+
+async def test_find_with_not_in_operator_builds_must_not_match_any_filter(repo, mock_client):
+    await repo.find(
+        criteria=[FieldFilter(field="quantity", operator=Operator.NOT_IN, value=[1, 2])]
+    )
+
+    _, kwargs = mock_client.scroll.call_args
+    query_filter = kwargs["scroll_filter"]
+    assert query_filter.must is None
+    assert query_filter.must_not[0].match.any == [1, 2]
+
+
+async def test_find_with_contains_operator_builds_match_text_filter(repo, mock_client):
+    await repo.find(criteria=[FieldFilter(field="name", operator=Operator.CONTAINS, value="alp")])
+
+    _, kwargs = mock_client.scroll.call_args
+    condition = kwargs["scroll_filter"].must[0]
+    assert condition.match.text == "alp"
+
+
+async def test_find_with_is_null_operator_true_builds_must_is_null_condition(repo, mock_client):
+    await repo.find(criteria=[FieldFilter(field="name", operator=Operator.IS_NULL, value=True)])
+
+    _, kwargs = mock_client.scroll.call_args
+    query_filter = kwargs["scroll_filter"]
+    assert query_filter.must[0].is_null.key == "name"
+    assert query_filter.must_not is None
+
+
+async def test_find_with_is_null_operator_false_builds_must_not_is_null_condition(
+    repo, mock_client
+):
+    await repo.find(criteria=[FieldFilter(field="name", operator=Operator.IS_NULL, value=False)])
+
+    _, kwargs = mock_client.scroll.call_args
+    query_filter = kwargs["scroll_filter"]
+    assert query_filter.must is None
+    assert query_filter.must_not[0].is_null.key == "name"
+
+
+async def test_find_raises_for_unsupported_operator(repo, mock_client):
+    bogus_filter = FieldFilter.model_construct(field="quantity", operator="bogus", value=1)
+
+    with pytest.raises(UnsupportedOperationError):
+        await repo.find(criteria=[bogus_filter])
+
+
 async def test_bulk_create_upserts_all_points_at_once(repo, mock_client):
     entities = [_make_entity(name=f"w{i}") for i in range(3)]
 
@@ -156,7 +243,9 @@ async def test_bulk_create_upserts_all_points_at_once(repo, mock_client):
 
 async def test_search_returns_entity_score_pairs_ordered_by_relevance(repo, mock_client):
     entity = _make_entity(name="closest")
-    mock_client.query_points.return_value = SimpleNamespace(points=[_fake_point(entity, score=0.99)])
+    mock_client.query_points.return_value = SimpleNamespace(
+        points=[_fake_point(entity, score=0.99)]
+    )
 
     hits = await repo.search([0.1, 0.2, 0.3], limit=5)
 

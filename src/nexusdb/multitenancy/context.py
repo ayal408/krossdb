@@ -21,10 +21,14 @@ from nexusdb.core.exceptions import CrossTenantAccessError
 from nexusdb.interfaces.repository import (
     AbstractRepository,
     BulkResult,
+    FieldFilter,
+    Operator,
     Page,
     SortSpec,
+    Specification,
     TId,
     TModel,
+    _normalize_criteria,
 )
 
 
@@ -39,9 +43,13 @@ class TenantScopedRepository(AbstractRepository[TModel, TId]):
         self._inner = inner
         self.model = inner.model
 
-    def _scoped_criteria(self, criteria: Mapping[str, Any] | None) -> dict[str, Any]:
-        scoped = dict(criteria) if criteria else {}
-        scoped["tenant_id"] = get_tenant_id(required=True)
+    def _scoped_criteria(
+        self, criteria: Mapping[str, Any] | Specification | None
+    ) -> list[FieldFilter]:
+        scoped = _normalize_criteria(criteria)
+        scoped.append(
+            FieldFilter(field="tenant_id", operator=Operator.EQ, value=get_tenant_id(required=True))
+        )
         return scoped
 
     def _owned(self, entity: TModel | None) -> TModel | None:
@@ -83,15 +91,17 @@ class TenantScopedRepository(AbstractRepository[TModel, TId]):
 
     async def find(
         self,
-        criteria: Mapping[str, Any] | None = None,
+        criteria: Mapping[str, Any] | Specification | None = None,
         *,
         limit: int = 50,
         offset: int = 0,
         sort: Sequence[SortSpec] | None = None,
     ) -> Page[TModel]:
-        return await self._inner.find(self._scoped_criteria(criteria), limit=limit, offset=offset, sort=sort)
+        return await self._inner.find(
+            self._scoped_criteria(criteria), limit=limit, offset=offset, sort=sort
+        )
 
-    async def count(self, criteria: Mapping[str, Any] | None = None) -> int:
+    async def count(self, criteria: Mapping[str, Any] | Specification | None = None) -> int:
         return await self._inner.count(self._scoped_criteria(criteria))
 
     async def bulk_create(

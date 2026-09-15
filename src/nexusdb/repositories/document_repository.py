@@ -10,6 +10,7 @@ their own migration).
 
 from __future__ import annotations
 
+import re
 from collections.abc import Mapping, Sequence
 from typing import Any
 
@@ -17,15 +18,71 @@ from pymongo import ASCENDING, DESCENDING
 
 from nexusdb.adapters.document.mongodb import MongoDBAdapter
 from nexusdb.core.exception_mapper import translate_exceptions
-from nexusdb.core.exceptions import NexusDBError, RecordNotFoundError
+from nexusdb.core.exceptions import NexusDBError, RecordNotFoundError, UnsupportedOperationError
 from nexusdb.interfaces.repository import (
     AbstractRepository,
     BulkResult,
+    FieldFilter,
+    Operator,
     Page,
     SortSpec,
+    Specification,
     TId,
     TModel,
+    _normalize_criteria,
 )
+
+_MONGO_OPERATORS: dict[Operator, str] = {
+    Operator.NE: "$ne",
+    Operator.GT: "$gt",
+    Operator.GTE: "$gte",
+    Operator.LT: "$lt",
+    Operator.LTE: "$lte",
+    Operator.IN: "$in",
+    Operator.NOT_IN: "$nin",
+}
+
+
+def _clause_for_filter(filt: FieldFilter) -> Any:
+    operator = filt.operator
+    value = filt.value
+    if operator is Operator.EQ:
+        return value
+    if operator is Operator.IS_NULL:
+        # `{field: None}` already matches a missing field too, which is the
+        # usual meaning of "is null"; `$ne: None` excludes both missing and null.
+        return None if value else {"$ne": None}
+    if operator is Operator.CONTAINS:
+        return {"$regex": re.escape(str(value))}
+    if operator in _MONGO_OPERATORS:
+        return {_MONGO_OPERATORS[operator]: value}
+    raise UnsupportedOperationError(
+        f"Operator {operator!r} is not supported by the document adapter"
+    )
+
+
+def _criteria_to_query(criteria: Mapping[str, Any] | Specification | None) -> dict[str, Any]:
+    query: dict[str, Any] = {}
+    extra_clauses: list[dict[str, Any]] = []
+    for filt in _normalize_criteria(criteria):
+        clause = _clause_for_filter(filt)
+        existing = query.get(filt.field)
+        if filt.field not in query:
+            query[filt.field] = clause
+        elif (
+            isinstance(existing, dict)
+            and isinstance(clause, dict)
+            and existing.keys().isdisjoint(clause)
+        ):
+            # Merge only when the operator keys don't overlap; an overlap (or
+            # a non-mergeable scalar clause) would otherwise silently
+            # overwrite the earlier constraint instead of AND-ing it in.
+            query[filt.field] = {**existing, **clause}
+        else:
+            extra_clauses.append({filt.field: clause})
+    if extra_clauses:
+        return {"$and": [query, *extra_clauses]} if query else {"$and": extra_clauses}
+    return query
 
 
 class MongoDBRepository(AbstractRepository[TModel, TId]):
@@ -82,13 +139,13 @@ class MongoDBRepository(AbstractRepository[TModel, TId]):
 
     async def find(
         self,
-        criteria: Mapping[str, Any] | None = None,
+        criteria: Mapping[str, Any] | Specification | None = None,
         *,
         limit: int = 50,
         offset: int = 0,
         sort: Sequence[SortSpec] | None = None,
     ) -> Page[TModel]:
-        query = dict(criteria) if criteria else {}
+        query = _criteria_to_query(criteria)
         async with self.adapter.acquire() as db:
             collection = db[self.collection_name]
             with translate_exceptions(collection=self.collection_name, op="find"):
@@ -103,8 +160,8 @@ class MongoDBRepository(AbstractRepository[TModel, TId]):
             items=[self._doc_to_model(doc) for doc in docs], total=total, limit=limit, offset=offset
         )
 
-    async def count(self, criteria: Mapping[str, Any] | None = None) -> int:
-        query = dict(criteria) if criteria else {}
+    async def count(self, criteria: Mapping[str, Any] | Specification | None = None) -> int:
+        query = _criteria_to_query(criteria)
         async with self.adapter.acquire() as db:
             with translate_exceptions(collection=self.collection_name, op="count"):
                 return await db[self.collection_name].count_documents(query)

@@ -8,8 +8,18 @@ from typing import Any
 
 import pytest
 
+from nexusdb.core.exceptions import UnsupportedOperationError
 from nexusdb.core.logging import configure_logging
-from nexusdb.interfaces.repository import AbstractRepository, BulkResult, Page, SortSpec
+from nexusdb.interfaces.repository import (
+    AbstractRepository,
+    BulkResult,
+    FieldFilter,
+    Operator,
+    Page,
+    SortSpec,
+    Specification,
+    _normalize_criteria,
+)
 from nexusdb.models.base import Entity
 
 
@@ -22,6 +32,35 @@ class Widget(Entity):
 
     name: str
     quantity: int = 0
+
+
+def _matches(widget: Widget, filt: FieldFilter) -> bool:
+    actual = getattr(widget, filt.field, None)
+    operator = filt.operator
+    value = filt.value
+    if operator is Operator.EQ:
+        return actual == value
+    if operator is Operator.NE:
+        return actual != value
+    if operator is Operator.GT:
+        return actual is not None and actual > value
+    if operator is Operator.GTE:
+        return actual is not None and actual >= value
+    if operator is Operator.LT:
+        return actual is not None and actual < value
+    if operator is Operator.LTE:
+        return actual is not None and actual <= value
+    if operator is Operator.IN:
+        return actual in value
+    if operator is Operator.NOT_IN:
+        return actual not in value
+    if operator is Operator.CONTAINS:
+        return actual is not None and str(value) in str(actual)
+    if operator is Operator.IS_NULL:
+        return (actual is None) is bool(value)
+    raise UnsupportedOperationError(
+        f"Operator {operator!r} is not supported by the in-memory repository"
+    )
 
 
 class InMemoryWidgetRepository(AbstractRepository[Widget, uuid.UUID]):
@@ -59,21 +98,19 @@ class InMemoryWidgetRepository(AbstractRepository[Widget, uuid.UUID]):
 
     async def find(
         self,
-        criteria: Mapping[str, Any] | None = None,
+        criteria: Mapping[str, Any] | Specification | None = None,
         *,
         limit: int = 50,
         offset: int = 0,
         sort: Sequence[SortSpec] | None = None,
     ) -> Page[Widget]:
         items = list(self._store.values())
-        if criteria:
-            items = [
-                w for w in items if all(getattr(w, k, None) == v for k, v in criteria.items())
-            ]
+        for filt in _normalize_criteria(criteria):
+            items = [w for w in items if _matches(w, filt)]
         total = len(items)
         return Page(items=items[offset : offset + limit], total=total, limit=limit, offset=offset)
 
-    async def count(self, criteria: Mapping[str, Any] | None = None) -> int:
+    async def count(self, criteria: Mapping[str, Any] | Specification | None = None) -> int:
         page = await self.find(criteria, limit=len(self._store) or 1)
         return page.total or 0
 
@@ -86,7 +123,9 @@ class InMemoryWidgetRepository(AbstractRepository[Widget, uuid.UUID]):
             succeeded.append(entity)
         return BulkResult(succeeded=succeeded)
 
-    async def bulk_update(self, updates: Mapping[uuid.UUID, Mapping[str, Any]]) -> BulkResult[Widget]:
+    async def bulk_update(
+        self, updates: Mapping[uuid.UUID, Mapping[str, Any]]
+    ) -> BulkResult[Widget]:
         succeeded, failed = [], {}
         for idx, (id_, changes) in enumerate(updates.items()):
             try:

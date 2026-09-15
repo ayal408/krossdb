@@ -104,7 +104,9 @@ async def test_repository_crud_round_trip(widget_repo: QdrantRepository) -> None
     assert await widget_repo.get_by_id(entity.id) is None
 
 
-async def test_repository_update_missing_raises_record_not_found(widget_repo: QdrantRepository) -> None:
+async def test_repository_update_missing_raises_record_not_found(
+    widget_repo: QdrantRepository,
+) -> None:
     with pytest.raises(RecordNotFoundError):
         await widget_repo.update(uuid.uuid4(), {"name": "x"})
 

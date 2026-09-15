@@ -69,8 +69,12 @@ async def test_integrity_violation_is_mapped_to_duplicate_record_error(postgres_
     engine = create_async_engine(postgres_dsn)
     try:
         async with engine.begin() as conn:
-            await conn.execute(text("CREATE TABLE IF NOT EXISTS raw_widgets_it (id INT PRIMARY KEY)"))
-            await conn.execute(text("INSERT INTO raw_widgets_it (id) VALUES (1) ON CONFLICT DO NOTHING"))
+            await conn.execute(
+                text("CREATE TABLE IF NOT EXISTS raw_widgets_it (id INT PRIMARY KEY)")
+            )
+            await conn.execute(
+                text("INSERT INTO raw_widgets_it (id) VALUES (1) ON CONFLICT DO NOTHING")
+            )
 
         with pytest.raises(DuplicateRecordError):
             async with engine.begin() as conn:
@@ -124,12 +128,16 @@ async def test_repository_unique_violation_maps_to_duplicate_record_error(
         await widget_repo.create(Widget(name=name, quantity=2))
 
 
-async def test_repository_update_missing_raises_record_not_found(widget_repo: SQLAlchemyRepository) -> None:
+async def test_repository_update_missing_raises_record_not_found(
+    widget_repo: SQLAlchemyRepository,
+) -> None:
     with pytest.raises(RecordNotFoundError):
         await widget_repo.update(uuid.uuid4(), {"quantity": 1})
 
 
-async def test_bulk_create_partial_success_against_real_postgres(widget_repo: SQLAlchemyRepository) -> None:
+async def test_bulk_create_partial_success_against_real_postgres(
+    widget_repo: SQLAlchemyRepository,
+) -> None:
     name = f"bulk-dup-{uuid.uuid4()}"
     w1 = Widget(name=name, quantity=1)
     w2 = Widget(name=name, quantity=2)  # unique-constraint collision

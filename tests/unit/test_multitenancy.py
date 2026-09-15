@@ -30,7 +30,9 @@ async def test_create_stamps_the_active_tenant(scoped_repository, make_widget):
     assert created.tenant_id == "tenant-a"
 
 
-async def test_create_rejects_entity_pre_stamped_with_a_different_tenant(scoped_repository, make_widget):
+async def test_create_rejects_entity_pre_stamped_with_a_different_tenant(
+    scoped_repository, make_widget
+):
     with tenant_scope("tenant-a"), pytest.raises(CrossTenantAccessError):
         await scoped_repository.create(make_widget(tenant_id="tenant-other"))
 

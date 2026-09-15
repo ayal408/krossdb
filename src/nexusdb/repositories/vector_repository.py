@@ -12,27 +12,80 @@ from __future__ import annotations
 from collections.abc import Mapping, Sequence
 from typing import Any
 
-from qdrant_client.models import FieldCondition, Filter, MatchValue, PointStruct
+from qdrant_client.models import (
+    FieldCondition,
+    Filter,
+    IsNullCondition,
+    MatchAny,
+    MatchExcept,
+    MatchText,
+    MatchValue,
+    PayloadField,
+    PointStruct,
+    Range,
+)
 
 from nexusdb.adapters.vector.qdrant import QdrantAdapter
 from nexusdb.core.exception_mapper import translate_exceptions
-from nexusdb.core.exceptions import NexusDBError, RecordNotFoundError
+from nexusdb.core.exceptions import NexusDBError, RecordNotFoundError, UnsupportedOperationError
 from nexusdb.interfaces.repository import (
     AbstractRepository,
     BulkResult,
+    FieldFilter,
+    Operator,
     Page,
     SortSpec,
+    Specification,
     TId,
     TModel,
+    _normalize_criteria,
 )
 
 
-def _criteria_to_filter(criteria: Mapping[str, Any] | None) -> Filter | None:
-    if not criteria:
+def _criteria_to_filter(criteria: Mapping[str, Any] | Specification | None) -> Filter | None:
+    filters = _normalize_criteria(criteria)
+    if not filters:
         return None
-    return Filter(
-        must=[FieldCondition(key=k, match=MatchValue(value=v)) for k, v in criteria.items()]
-    )
+    must: list[Any] = []
+    must_not: list[Any] = []
+    for filt in filters:
+        _add_condition(filt, must, must_not)
+    return Filter(must=must or None, must_not=must_not or None)
+
+
+def _add_condition(filt: FieldFilter, must: list[Any], must_not: list[Any]) -> None:
+    operator = filt.operator
+    value = filt.value
+    if operator is Operator.EQ:
+        must.append(FieldCondition(key=filt.field, match=MatchValue(value=value)))
+    elif operator is Operator.NE:
+        # MatchExcept's field is named `except_` in Python but aliased to the
+        # reserved word `except` on the wire, so it must be constructed via
+        # keyword-unpacking rather than a literal `except_=` argument.
+        must.append(FieldCondition(key=filt.field, match=MatchExcept(**{"except": [value]})))
+    elif operator is Operator.IN:
+        must.append(FieldCondition(key=filt.field, match=MatchAny(any=list(value))))
+    elif operator is Operator.NOT_IN:
+        must_not.append(FieldCondition(key=filt.field, match=MatchAny(any=list(value))))
+    elif operator is Operator.GT:
+        must.append(FieldCondition(key=filt.field, range=Range(gt=value)))
+    elif operator is Operator.GTE:
+        must.append(FieldCondition(key=filt.field, range=Range(gte=value)))
+    elif operator is Operator.LT:
+        must.append(FieldCondition(key=filt.field, range=Range(lt=value)))
+    elif operator is Operator.LTE:
+        must.append(FieldCondition(key=filt.field, range=Range(lte=value)))
+    elif operator is Operator.CONTAINS:
+        # MatchText tokenizes and requires a full-text index on the field; it is
+        # the closest Qdrant equivalent to a substring filter.
+        must.append(FieldCondition(key=filt.field, match=MatchText(text=str(value))))
+    elif operator is Operator.IS_NULL:
+        condition = IsNullCondition(is_null=PayloadField(key=filt.field))
+        (must if value else must_not).append(condition)
+    else:
+        raise UnsupportedOperationError(
+            f"Operator {operator!r} is not supported by the vector adapter"
+        )
 
 
 class QdrantRepository(AbstractRepository[TModel, TId]):
@@ -56,7 +109,9 @@ class QdrantRepository(AbstractRepository[TModel, TId]):
     async def get_by_id(self, id_: TId) -> TModel | None:
         async with self.adapter.acquire() as client:
             with translate_exceptions(collection=self.collection_name, op="get_by_id"):
-                points = await client.retrieve(self.collection_name, ids=[str(id_)], with_vectors=True)
+                points = await client.retrieve(
+                    self.collection_name, ids=[str(id_)], with_vectors=True
+                )
         return self._point_to_model(points[0]) if points else None
 
     async def create(self, entity: TModel, *, idempotency_key: str | None = None) -> TModel:
@@ -69,7 +124,9 @@ class QdrantRepository(AbstractRepository[TModel, TId]):
     async def update(self, id_: TId, changes: Mapping[str, Any]) -> TModel:
         async with self.adapter.acquire() as client:
             with translate_exceptions(collection=self.collection_name, op="update"):
-                await client.set_payload(self.collection_name, payload=dict(changes), points=[str(id_)])
+                await client.set_payload(
+                    self.collection_name, payload=dict(changes), points=[str(id_)]
+                )
         updated = await self.get_by_id(id_)
         if updated is None:
             raise RecordNotFoundError(self.model.__name__, id_)
@@ -86,7 +143,7 @@ class QdrantRepository(AbstractRepository[TModel, TId]):
 
     async def find(
         self,
-        criteria: Mapping[str, Any] | None = None,
+        criteria: Mapping[str, Any] | Specification | None = None,
         *,
         limit: int = 50,
         offset: int = 0,
@@ -110,7 +167,7 @@ class QdrantRepository(AbstractRepository[TModel, TId]):
             offset=offset,
         )
 
-    async def count(self, criteria: Mapping[str, Any] | None = None) -> int:
+    async def count(self, criteria: Mapping[str, Any] | Specification | None = None) -> int:
         query_filter = _criteria_to_filter(criteria)
         async with self.adapter.acquire() as client:
             with translate_exceptions(collection=self.collection_name, op="count"):
@@ -149,7 +206,7 @@ class QdrantRepository(AbstractRepository[TModel, TId]):
         vector: Sequence[float],
         *,
         limit: int = 10,
-        criteria: Mapping[str, Any] | None = None,
+        criteria: Mapping[str, Any] | Specification | None = None,
     ) -> list[tuple[TModel, float]]:
         """Similarity search: returns ``(entity, score)`` pairs ordered by relevance."""
 

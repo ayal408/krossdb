@@ -72,7 +72,9 @@ async def test_exists_returns_bool_not_raw_int(cache, mock_client):
 
 
 async def test_clear_prefix_deletes_every_matching_key_and_returns_count(cache, mock_client):
-    mock_client.scan_iter.return_value = FakeScanIter(["nexusdb-test:widgets:1", "nexusdb-test:widgets:2"])
+    mock_client.scan_iter.return_value = FakeScanIter(
+        ["nexusdb-test:widgets:1", "nexusdb-test:widgets:2"]
+    )
 
     removed = await cache.clear_prefix("widgets")
 

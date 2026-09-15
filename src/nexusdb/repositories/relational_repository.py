@@ -15,23 +15,73 @@ into it.
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from typing import Any, cast
+from typing import Any, TypeVar, cast
 
 from sqlalchemy import CursorResult, Table, delete, func, select, update
 from sqlalchemy.engine import RowMapping
+from sqlalchemy.sql import Select
+from sqlalchemy.sql.elements import ColumnElement
 
 from nexusdb.adapters.relational.base import SQLAlchemyAdapter
 from nexusdb.core.enums import RoutingRole
 from nexusdb.core.exception_mapper import translate_exceptions
-from nexusdb.core.exceptions import NexusDBError, RecordNotFoundError
+from nexusdb.core.exceptions import NexusDBError, RecordNotFoundError, UnsupportedOperationError
 from nexusdb.interfaces.repository import (
     AbstractRepository,
     BulkResult,
+    FieldFilter,
+    Operator,
     Page,
     SortSpec,
+    Specification,
     TId,
     TModel,
+    _normalize_criteria,
 )
+
+_SelectT = TypeVar("_SelectT", bound="Select[Any]")
+
+
+def _condition_for_filter(table: Table, filt: FieldFilter) -> ColumnElement[bool]:
+    column = cast("ColumnElement[Any]", table.c[filt.field])
+    operator = filt.operator
+    value = filt.value
+    # SQLAlchemy's comparison dunders are typed to return Any (they can't
+    # narrow object.__eq__'s signature), so each needs an explicit cast.
+    if operator is Operator.EQ:
+        return cast("ColumnElement[bool]", column == value)
+    if operator is Operator.NE:
+        return cast("ColumnElement[bool]", column != value)
+    if operator is Operator.GT:
+        return cast("ColumnElement[bool]", column > value)
+    if operator is Operator.GTE:
+        return cast("ColumnElement[bool]", column >= value)
+    if operator is Operator.LT:
+        return cast("ColumnElement[bool]", column < value)
+    if operator is Operator.LTE:
+        return cast("ColumnElement[bool]", column <= value)
+    if operator is Operator.IN:
+        return column.in_(value)
+    if operator is Operator.NOT_IN:
+        return ~column.in_(value)
+    if operator is Operator.CONTAINS:
+        return column.contains(value, autoescape=True)
+    if operator is Operator.IS_NULL:
+        # `value` defaults to None (falsy) on FieldFilter, so treat only an
+        # explicit False as "IS NOT NULL" — otherwise the operator's own name
+        # would be contradicted by omitting `value` entirely.
+        return column.is_not(None) if value is False else column.is_(None)
+    raise UnsupportedOperationError(
+        f"Operator {operator!r} is not supported by the relational adapter"
+    )
+
+
+def _apply_criteria(
+    stmt: _SelectT, table: Table, criteria: Mapping[str, Any] | Specification | None
+) -> _SelectT:
+    for filt in _normalize_criteria(criteria):
+        stmt = stmt.where(_condition_for_filter(table, filt))
+    return stmt
 
 
 class SQLAlchemyRepository(AbstractRepository[TModel, TId]):
@@ -96,16 +146,13 @@ class SQLAlchemyRepository(AbstractRepository[TModel, TId]):
 
     async def find(
         self,
-        criteria: Mapping[str, Any] | None = None,
+        criteria: Mapping[str, Any] | Specification | None = None,
         *,
         limit: int = 50,
         offset: int = 0,
         sort: Sequence[SortSpec] | None = None,
     ) -> Page[TModel]:
-        stmt = select(self.table)
-        if criteria:
-            for key, value in criteria.items():
-                stmt = stmt.where(self.table.c[key] == value)
+        stmt = _apply_criteria(select(self.table), self.table, criteria)
         if sort:
             for spec in sort:
                 column = self.table.c[spec.field]
@@ -121,11 +168,8 @@ class SQLAlchemyRepository(AbstractRepository[TModel, TId]):
 
         return Page(items=items, total=total, limit=limit, offset=offset)
 
-    async def count(self, criteria: Mapping[str, Any] | None = None) -> int:
-        stmt = select(func.count()).select_from(self.table)
-        if criteria:
-            for key, value in criteria.items():
-                stmt = stmt.where(self.table.c[key] == value)
+    async def count(self, criteria: Mapping[str, Any] | Specification | None = None) -> int:
+        stmt = _apply_criteria(select(func.count()).select_from(self.table), self.table, criteria)
         async with self.adapter.acquire(role=RoutingRole.REPLICA) as session:
             with translate_exceptions(table=self.table.name, op="count"):
                 return (await session.execute(stmt)).scalar_one()
