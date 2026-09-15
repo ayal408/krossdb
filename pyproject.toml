@@ -35,7 +35,7 @@ dependencies = [
     "opentelemetry-api>=1.25",
     "opentelemetry-sdk>=1.44.0",
     # Resilience
-    "tenacity>=8.3",
+    "tenacity>=9.1.4",
     # CLI
     "typer>=0.27.2",
     "rich>=13.7",
