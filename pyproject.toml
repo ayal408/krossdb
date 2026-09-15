@@ -3,7 +3,7 @@ requires = ["hatchling>=1.32.0"]
 build-backend = "hatchling.build"
 
 [project]
-name = "nexusdb"
+name = "krossdb"
 version = "0.1.0"
 description = "Enterprise-grade, multi-database unified interface & repository pattern library for Python"
 readme = "README.md"
@@ -56,10 +56,10 @@ otel-exporters = [
     "opentelemetry-instrumentation-sqlalchemy>=0.65b0",
 ]
 all = [
-    "nexusdb[postgres,mysql,sqlite,mongodb,vector,cache,otel-exporters]",
+    "krossdb[postgres,mysql,sqlite,mongodb,vector,cache,otel-exporters]",
 ]
 dev = [
-    "nexusdb[sqlite,mongodb,vector,cache]",
+    "krossdb[sqlite,mongodb,vector,cache]",
     "pytest>=8.2",
     "pytest-asyncio>=0.23",
     "pytest-mock>=3.14",

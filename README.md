@@ -1,12 +1,17 @@
 # nexusdb
 
 [![CI](https://github.com/ayal408/nexusdb/actions/workflows/ci.yml/badge.svg)](https://github.com/ayal408/nexusdb/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/krossdb.svg)](https://pypi.org/project/krossdb/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
 
 An enterprise-grade, multi-database Python library that provides a unified
 interface and repository pattern over relational (PostgreSQL/MySQL/SQLite),
 document (MongoDB), and vector (Qdrant) databases.
+
+> Published on PyPI as [`krossdb`](https://pypi.org/project/krossdb/) — the
+> name `nexusdb` was already taken by an unrelated package. The Python
+> package you `import` is unaffected and remains `nexusdb`.
 
 ## Why
 
@@ -50,6 +55,14 @@ supports an idempotency key; every raised error is a `NexusDBError` subclass
 `core/exception_mapper.py`, never leaked to callers).
 
 ## Installation
+
+```bash
+pip install krossdb             # from PyPI
+pip install krossdb[postgres]   # + asyncpg
+pip install krossdb[all]        # everything
+```
+
+For local development (editable install from a clone):
 
 ```bash
 pip install -e ".[dev]"          # core + dev/test tooling
