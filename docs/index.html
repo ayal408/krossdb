@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>nexusdb</title>
+<title>krossdb</title>
 <link rel="icon" href="data:,">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
@@ -225,14 +225,14 @@
 
 <nav class="nav">
   <div class="wrap">
-    <a class="brand" href="#top"><span class="dot"></span>nexusdb</a>
+    <a class="brand" href="#top"><span class="dot"></span>krossdb</a>
     <div class="nav-links">
       <a href="#why">Why</a>
       <a href="#architecture">Architecture</a>
       <a href="#features">Features</a>
       <a href="#quickstart">Quickstart</a>
       <a href="#adapters">Adapters</a>
-      <a class="nav-cta" href="https://github.com/ayal408/nexusdb" target="_blank" rel="noopener">GitHub ↗</a>
+      <a class="nav-cta" href="https://github.com/ayal408/krossdb" target="_blank" rel="noopener">GitHub ↗</a>
     </div>
   </div>
 </nav>
@@ -243,18 +243,18 @@
       <div>
         <span class="eyebrow">Python · async · MIT licensed</span>
         <h1>One repository interface.<br><span class="hl">Three kinds of database.</span></h1>
-        <p class="lead">nexusdb gives PostgreSQL, MySQL, SQLite, MongoDB, and Qdrant the same
+        <p class="lead">krossdb gives PostgreSQL, MySQL, SQLite, MongoDB, and Qdrant the same
           repository &amp; Unit-of-Work surface, the same exception hierarchy, and the same
           retries, caching, and observability — so your application code depends on an
           abstraction, not a driver.</p>
         <div class="hero-actions">
           <a class="btn btn-primary" href="#quickstart">See the quickstart →</a>
-          <a class="btn btn-ghost" href="https://github.com/ayal408/nexusdb" target="_blank" rel="noopener">View source</a>
+          <a class="btn btn-ghost" href="https://github.com/ayal408/krossdb" target="_blank" rel="noopener">View source</a>
         </div>
         <div class="install-line"><span class="prompt">$</span> pip install -e ".[dev]"</div>
       </div>
       <div>
-        <svg class="hub-figure" viewBox="0 0 420 320" role="img" aria-label="A central nexusdb adapter connecting to relational, document, and vector databases">
+        <svg class="hub-figure" viewBox="0 0 420 320" role="img" aria-label="A central krossdb adapter connecting to relational, document, and vector databases">
           <path class="hub-edge" d="M 210 150 C 150 120, 110 90, 78 66" />
           <path class="hub-edge" d="M 210 150 C 150 170, 100 185, 70 190" />
           <path class="hub-edge" d="M 230 150 C 290 120, 330 90, 358 66" />
@@ -279,7 +279,7 @@
 
           <g class="hub-node">
             <rect x="160" y="118" width="100" height="50" rx="9" fill="var(--accent)" />
-            <text x="210" y="148" text-anchor="middle" class="hub-core-label">nexusdb</text>
+            <text x="210" y="148" text-anchor="middle" class="hub-core-label">krossdb</text>
           </g>
 
           <g class="hub-node">
@@ -322,7 +322,7 @@
     </div>
     <div class="why-grid">
       <div class="why-card problem">
-        <h3>WITHOUT NEXUSDB</h3>
+        <h3>WITHOUT krossdb</h3>
         <ul>
           <li>A different try/except shape per driver — asyncpg errors don't look like pymongo errors</li>
           <li>Retry and backoff logic reinvented in every service that calls the database</li>
@@ -331,9 +331,9 @@
         </ul>
       </div>
       <div class="why-card solution">
-        <h3>WITH NEXUSDB</h3>
+        <h3>WITH krossdb</h3>
         <ul>
-          <li>Every driver exception translated centrally into one <code class="inline">NexusDBError</code> hierarchy</li>
+          <li>Every driver exception translated centrally into one <code class="inline">krossdbError</code> hierarchy</li>
           <li>Circuit breaker + exponential backoff applied uniformly by the adapter layer</li>
           <li><code class="inline">TenantScopedRepository</code> makes isolation the default, not an afterthought</li>
           <li>structlog + OpenTelemetry wired in from the first query, with correlation/tenant context</li>
@@ -347,11 +347,11 @@
       <span class="eyebrow">Architecture</span>
       <h2>One package, one layout per concern</h2>
       <p>Every domain entity is a Pydantic v2 model. Every mutating repository method supports
-        an idempotency key. Every raised error is a <code class="inline">NexusDBError</code>
+        an idempotency key. Every raised error is a <code class="inline">krossdbError</code>
         subclass — driver exceptions never leak past the adapter boundary.</p>
     </div>
     <div class="tree-panel">
-<pre><span class="c-txt">src/nexusdb/</span>
+<pre><span class="c-txt">src/krossdb/</span>
 <span class="c-dim">├── core/</span>          <span class="c-dim">settings, exception hierarchy, driver-error mapper,</span>
 <span class="c-dim">│                structlog config, correlation/tenant context</span>
 <span class="c-dim">├── interfaces/</span>    <span class="c-dim">AbstractDatabaseAdapter, AbstractRepository,</span>
@@ -370,7 +370,7 @@
 <span class="c-dim">├── multitenancy/</span> <span class="c-dim">tenant isolation helpers</span>
 <span class="c-dim">├── factory/</span>       <span class="c-dim">DatabaseFactory — builds/owns every configured adapter</span>
 <span class="c-dim">├── models/</span>        <span class="c-dim">shared Pydantic base models (Entity, AuditRecord)</span>
-<span class="c-dim">└── cli/</span>           <span class="c-dim">`nexusdb` console script (init, health, schema create)</span></pre>
+<span class="c-dim">└── cli/</span>           <span class="c-dim">`krossdb` console script (init, health, schema create)</span></pre>
     </div>
   </section>
 
@@ -529,14 +529,14 @@ config = ConnectionConfig(
   <footer>
     <div class="foot-grid">
       <div>
-        <a class="brand" href="#top" style="margin-bottom:10px; display:inline-flex;"><span class="dot"></span>nexusdb</a>
+        <a class="brand" href="#top" style="margin-bottom:10px; display:inline-flex;"><span class="dot"></span>krossdb</a>
         <p class="foot-meta" style="margin-top:10px;">v0.1.0 · Python 3.11+ · MIT License</p>
       </div>
       <div class="foot-links">
-        <a href="https://github.com/ayal408/nexusdb" target="_blank" rel="noopener">GitHub</a>
-        <a href="https://github.com/ayal408/nexusdb/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
-        <a href="https://github.com/ayal408/nexusdb/issues" target="_blank" rel="noopener">Issues</a>
-        <a href="https://github.com/ayal408/nexusdb/blob/main/LICENSE" target="_blank" rel="noopener">License</a>
+        <a href="https://github.com/ayal408/krossdb" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/ayal408/krossdb/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
+        <a href="https://github.com/ayal408/krossdb/issues" target="_blank" rel="noopener">Issues</a>
+        <a href="https://github.com/ayal408/krossdb/blob/main/LICENSE" target="_blank" rel="noopener">License</a>
       </div>
     </div>
   </footer>
