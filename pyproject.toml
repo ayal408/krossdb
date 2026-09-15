@@ -49,7 +49,7 @@ postgres = ["asyncpg>=0.29"]
 mysql = ["asyncmy>=0.2.9"]
 sqlite = ["aiosqlite>=0.20"]
 mongodb = ["motor>=3.7.1", "pymongo>=4.7"]
-vector = ["qdrant-client>=1.9"]
+vector = ["qdrant-client>=1.19.0"]
 cache = ["redis[hiredis]>=8.1.0"]
 otel-exporters = [
     "opentelemetry-exporter-otlp>=1.25",
