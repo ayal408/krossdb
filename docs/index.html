@@ -4,239 +4,206 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>nexusdb</title>
+<link rel="icon" href="data:,">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap');
-
   :root {
-    --paper: #eaeff5;
+    --ink: #14181f;
+    --paper: #f5f6f3;
     --paper-raised: #ffffff;
-    --grid: #cbd8e5;
-    --line: #16324f;
-    --line-soft: #9fb3c8;
-    --text: #12202f;
-    --text-dim: #45596e;
-    --text-faint: #7c8fa3;
-    --accent: #d6491f;
-    --accent-strong: #b83a14;
-    --accent-soft: #fbe1d3;
-    --relational: #2452a6;
-    --document: #6a4fc9;
-    --vector: #17836b;
-    --panel-bg: #ffffff;
-    --code-bg: #0f2038;
-    --code-text: #d9e6f2;
-    --font-display: "Oswald", "Arial Narrow", sans-serif;
+    --line: #dcdfd8;
+    --text: #1c2027;
+    --text-dim: #565f5a;
+    --text-faint: #8a9088;
+    --accent: #c1701f;
+    --accent-strong: #a25c15;
+    --accent-soft: #f3e0c8;
+    --relational: #2f8a72;
+    --document: #5b62c9;
+    --vector: #c94f68;
+    --code-bg: #1c2027;
+    --code-text: #e7e5df;
+    --shadow: 0 1px 2px rgba(20, 24, 31, 0.06), 0 8px 24px rgba(20, 24, 31, 0.05);
+    --radius: 10px;
+    --font-display: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+    --font-body: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
     --font-mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
   }
 
   @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --paper: #0a1626;
-      --paper-raised: #0f1d30;
-      --grid: #17263b;
-      --line: #6f93bd;
-      --line-soft: #2b4058;
-      --text: #e7eef7;
-      --text-dim: #a9bcd1;
-      --text-faint: #6c839c;
-      --accent: #ff8348;
-      --accent-strong: #ffa06c;
-      --accent-soft: #3a2415;
-      --relational: #7fb0ec;
-      --document: #b7a6f5;
-      --vector: #5fd6b3;
-      --panel-bg: #0f1d30;
-      --code-bg: #071223;
-      --code-text: #d9e6f2;
+    :root {
+      --ink: #0f1216;
+      --paper: #14171d;
+      --paper-raised: #1a1e25;
+      --line: #2a2f38;
+      --text: #e9e9e4;
+      --text-dim: #a7ada6;
+      --text-faint: #767d78;
+      --accent: #e2953f;
+      --accent-strong: #f0ad64;
+      --accent-soft: #3a2c17;
+      --relational: #4fbf9f;
+      --document: #8891e8;
+      --vector: #e2748a;
+      --code-bg: #0c0e12;
+      --code-text: #e7e5df;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 28px rgba(0, 0, 0, 0.35);
     }
-  }
-
-  :root[data-theme="dark"] {
-    --paper: #0a1626;
-    --paper-raised: #0f1d30;
-    --grid: #17263b;
-    --line: #6f93bd;
-    --line-soft: #2b4058;
-    --text: #e7eef7;
-    --text-dim: #a9bcd1;
-    --text-faint: #6c839c;
-    --accent: #ff8348;
-    --accent-strong: #ffa06c;
-    --accent-soft: #3a2415;
-    --relational: #7fb0ec;
-    --document: #b7a6f5;
-    --vector: #5fd6b3;
-    --panel-bg: #0f1d30;
-    --code-bg: #071223;
-    --code-text: #d9e6f2;
   }
 
   * { box-sizing: border-box; }
 
   body {
-    background-color: var(--paper);
-    background-image:
-      linear-gradient(var(--grid) 1px, transparent 1px),
-      linear-gradient(90deg, var(--grid) 1px, transparent 1px);
-    background-size: 28px 28px;
+    background: var(--paper);
     color: var(--text);
-    font-family: var(--font-mono);
+    font-family: var(--font-body);
     margin: 0;
     padding: 0 20px;
-    line-height: 1.6;
+    line-height: 1.55;
   }
 
-  h1, h2, h3 {
-    font-family: var(--font-display); font-weight: 600; text-transform: uppercase;
-    letter-spacing: 0.01em; text-wrap: balance; margin: 0; color: var(--text);
-  }
+  h1, h2, h3 { text-wrap: balance; font-family: var(--font-display); font-weight: 600; letter-spacing: -0.01em; margin: 0; }
 
   a { color: var(--accent-strong); }
-  p { margin: 0; }
 
-  .wrap { max-width: 1100px; margin: 0 auto; }
+  .wrap { max-width: 1080px; margin: 0 auto; }
 
-  code.inline {
-    font-family: var(--font-mono); font-size: 0.85em; background: var(--accent-soft);
-    color: var(--accent-strong); padding: 1px 6px; border: 1px solid var(--accent-strong);
-  }
-
-  /* ---- title block (nav) ---- */
-  .titleblock {
+  /* ---- nav ---- */
+  .nav {
     position: sticky; top: 0; z-index: 20;
-    background: color-mix(in srgb, var(--paper) 92%, transparent);
-    backdrop-filter: blur(6px);
-    border-bottom: 2px solid var(--line);
+    background: color-mix(in srgb, var(--paper) 88%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
   }
-  .titleblock .wrap { display: flex; align-items: center; justify-content: space-between; padding-block: 12px; gap: 18px; flex-wrap: wrap; }
-  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; }
-  .brand-mark { width: 22px; height: 22px; flex: none; }
-  .brand-name { font-family: var(--font-display); font-weight: 600; font-size: 1.15rem; letter-spacing: 0.03em; text-transform: uppercase; color: var(--text); }
-  .tb-fields { display: flex; align-items: center; gap: 0; border: 1px solid var(--line-soft); }
-  .tb-field { padding: 6px 12px; font-size: 0.72rem; border-right: 1px solid var(--line-soft); text-align: center; }
-  .tb-field:last-child { border-right: none; }
-  .tb-field .k { display: block; color: var(--text-faint); letter-spacing: 0.08em; font-size: 0.62rem; }
-  .tb-field .v { display: block; color: var(--text); font-weight: 500; margin-top: 2px; }
-  .nav-links { display: flex; align-items: center; gap: 18px; font-size: 0.78rem; }
-  .nav-links a { color: var(--text-dim); text-decoration: none; }
+  .nav .wrap { display: flex; align-items: center; justify-content: space-between; padding-block: 14px; gap: 16px; }
+  .brand { display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-weight: 600; font-size: 1.05rem; color: var(--text); text-decoration: none; }
+  .brand .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .nav-links { display: flex; align-items: center; gap: 22px; font-size: 0.88rem; }
+  .nav-links a { color: var(--text-dim); text-decoration: none; font-weight: 500; }
   .nav-links a:hover { color: var(--accent-strong); }
-  .btn-gh {
-    font-family: var(--font-mono); font-size: 0.76rem; text-decoration: none !important;
-    padding: 8px 14px; border: 2px solid var(--line); color: var(--text) !important; background: var(--paper-raised);
-  }
-  .btn-gh:hover { border-color: var(--accent); color: var(--accent-strong) !important; }
+  .nav-cta { border: 1px solid var(--line); border-radius: 7px; padding: 6px 12px; font-family: var(--font-mono); font-size: 0.82rem; color: var(--text) !important; }
 
   /* ---- hero ---- */
-  .hero { padding-block: 52px 44px; }
-  .sheet-note {
-    display: inline-block; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase;
-    color: var(--accent-strong); border-bottom: 2px solid var(--accent); padding-bottom: 4px; margin-bottom: 20px;
+  .hero { padding-block: 56px 40px; }
+  .eyebrow {
+    display: inline-flex; align-items: center; gap: 8px;
+    font-family: var(--font-mono); font-size: 0.76rem; letter-spacing: 0.08em; text-transform: uppercase;
+    color: var(--accent-strong); background: var(--accent-soft); border-radius: 999px; padding: 5px 12px;
+    margin-bottom: 18px;
   }
-  .hero-grid { display: grid; grid-template-columns: 1.05fr 1fr; gap: 40px; align-items: start; }
-  .hero h1 { font-size: clamp(2rem, 3.8vw, 3.1rem); line-height: 1.06; }
-  .hero h1 .hl { color: var(--accent); }
-  .hero p.lead { font-family: var(--font-mono); color: var(--text-dim); font-size: 0.98rem; max-width: 48ch; margin: 20px 0 26px; line-height: 1.7; }
+  .hero-grid { display: grid; grid-template-columns: 1.1fr 1fr; gap: 48px; align-items: center; }
+  .hero h1 { font-size: clamp(1.9rem, 3.4vw, 2.7rem); line-height: 1.12; }
+  .hero h1 .hl { color: var(--accent-strong); }
+  .hero p.lead { color: var(--text-dim); font-size: 1.05rem; max-width: 46ch; margin: 18px 0 26px; }
   .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
   .btn {
-    font-family: var(--font-display); font-weight: 500; letter-spacing: 0.03em; text-transform: uppercase;
-    font-size: 0.86rem; text-decoration: none; padding: 12px 20px; display: inline-flex; align-items: center; gap: 8px;
-    border: 2px solid var(--line);
+    font-family: var(--font-mono); font-size: 0.88rem; font-weight: 500; text-decoration: none;
+    padding: 11px 18px; border-radius: 8px; display: inline-flex; align-items: center; gap: 8px;
   }
-  .btn-primary { background: var(--accent); border-color: var(--accent); color: #0f1d30; }
-  .btn-primary:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
-  .btn-ghost { color: var(--text) !important; background: var(--paper-raised); }
+  .btn-primary { background: var(--accent); color: #14171d; }
+  .btn-primary:hover { background: var(--accent-strong); }
+  .btn-ghost { border: 1px solid var(--line); color: var(--text) !important; }
   .btn-ghost:hover { border-color: var(--accent); }
   .install-line {
-    font-family: var(--font-mono); font-size: 0.84rem; color: var(--text-dim);
-    background: var(--paper-raised); border: 1px solid var(--line-soft);
-    padding: 10px 14px; display: inline-flex; gap: 10px; align-items: center; margin-top: 20px;
+    font-family: var(--font-mono); font-size: 0.85rem; color: var(--text-dim);
+    background: var(--paper-raised); border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 14px; display: inline-flex; gap: 10px; align-items: center; margin-top: 18px;
   }
   .install-line .prompt { color: var(--accent-strong); }
 
-  /* ---- figure panel (diagram + tree) ---- */
-  .figure {
-    border: 2px solid var(--line); background: var(--panel-bg); position: relative;
-  }
-  .figure::before, .figure::after,
-  .figure .corner-br::before, .figure .corner-br::after { content: ""; position: absolute; width: 10px; height: 10px; }
-  .figure::before { top: -2px; left: -2px; border-top: 2px solid var(--accent); border-left: 2px solid var(--accent); }
-  .figure::after { top: -2px; right: -2px; border-top: 2px solid var(--accent); border-right: 2px solid var(--accent); }
-  .figure-body { padding: 18px; }
-  .figure-caption {
-    border-top: 2px solid var(--line); padding: 8px 16px; font-size: 0.72rem;
-    letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); display: flex; justify-content: space-between;
-  }
-  .figure-caption b { color: var(--text-dim); font-weight: 600; }
-
+  /* ---- hub diagram ---- */
   .hub-figure { width: 100%; height: auto; }
-  .hub-label { font-family: var(--font-mono); font-size: 12px; font-weight: 600; fill: var(--text); }
-  .hub-sub { font-family: var(--font-mono); font-size: 10px; fill: var(--text-faint); }
-  .hub-core-label { font-family: var(--font-display); font-size: 13px; font-weight: 600; letter-spacing: 0.04em; fill: #0f1d30; }
-  .hub-edge { stroke: var(--line-soft); stroke-width: 1.5; fill: none; }
-  .hub-tick { stroke: var(--line-soft); stroke-width: 1.5; }
+  .hub-node text { font-family: var(--font-mono); }
+  .hub-label { font-size: 12.5px; fill: var(--text); font-weight: 600; }
+  .hub-sub { font-size: 10.5px; fill: var(--text-faint); }
+  .hub-core-label { font-family: var(--font-mono); font-size: 13px; font-weight: 600; fill: var(--ink); }
+  .hub-edge { stroke: var(--line); stroke-width: 1.6; fill: none; }
+  .hub-pulse { r: 3.2; }
 
   /* ---- section shell ---- */
-  section { padding-block: 46px; border-top: 2px solid var(--line-soft); }
-  .section-head { max-width: 64ch; margin-bottom: 26px; display: flex; align-items: baseline; gap: 14px; }
-  .sheet-num { font-family: var(--font-mono); font-size: 0.8rem; color: var(--accent-strong); font-weight: 600; }
-  .section-head h2 { font-size: clamp(1.3rem, 2.1vw, 1.65rem); }
-  .section-head p { display: block; color: var(--text-dim); margin: 10px 0 0; font-size: 0.9rem; font-family: var(--font-mono); max-width: 64ch; }
+  section { padding-block: 46px; border-top: 1px solid var(--line); }
+  .section-head { max-width: 62ch; margin-bottom: 30px; }
+  .section-head .eyebrow { margin-bottom: 12px; }
+  .section-head h2 { font-size: clamp(1.4rem, 2.2vw, 1.8rem); }
+  .section-head p { color: var(--text-dim); margin: 12px 0 0; font-size: 0.98rem; }
 
   /* ---- why (problem/solution) ---- */
-  .why-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  .why-panel { border: 2px solid var(--line-soft); background: var(--panel-bg); }
-  .why-panel .strip { padding: 9px 16px; font-family: var(--font-display); font-size: 0.82rem; letter-spacing: 0.05em; text-transform: uppercase; }
-  .why-panel.problem .strip { background: var(--accent-soft); color: var(--accent-strong); }
-  .why-panel.solution .strip { background: color-mix(in srgb, var(--vector) 16%, var(--panel-bg)); color: var(--vector); }
-  .why-panel ul { margin: 0; padding: 16px 18px 16px 34px; color: var(--text-dim); font-size: 0.88rem; }
-  .why-panel li + li { margin-top: 8px; }
+  .why-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+  .why-card { background: var(--paper-raised); border: 1px solid var(--line); border-radius: var(--radius); padding: 22px; }
+  .why-card h3 { font-size: 0.95rem; font-family: var(--font-mono); font-weight: 600; margin-bottom: 10px; }
+  .why-card.problem h3 { color: var(--vector); }
+  .why-card.solution h3 { color: var(--relational); }
+  .why-card p { color: var(--text-dim); font-size: 0.92rem; margin: 0; }
+  .why-card ul { margin: 10px 0 0; padding-left: 18px; color: var(--text-dim); font-size: 0.92rem; }
+  .why-card li + li { margin-top: 6px; }
+
+  /* ---- architecture tree ---- */
+  .tree-panel {
+    background: var(--code-bg); color: var(--code-text); border-radius: var(--radius);
+    padding: 22px 24px; overflow-x: auto; box-shadow: var(--shadow);
+  }
+  .tree-panel pre { margin: 0; font-family: var(--font-mono); font-size: 0.82rem; line-height: 1.72; white-space: pre; }
+  .tree-panel .c-rel { color: var(--relational); }
+  .tree-panel .c-doc { color: var(--document); }
+  .tree-panel .c-vec { color: var(--vector); }
+  .tree-panel .c-dim { color: #8a9088; }
+  .tree-panel .c-txt { color: var(--code-text); }
 
   /* ---- feature grid ---- */
-  .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; border: 1px solid var(--line-soft); background: var(--line-soft); }
-  .feature-card { background: var(--panel-bg); padding: 18px; display: flex; flex-direction: column; gap: 7px; }
-  .feature-card .tag { font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent-strong); }
-  .feature-card h3 { font-size: 0.92rem; letter-spacing: 0.01em; }
-  .feature-card p { color: var(--text-dim); font-size: 0.84rem; font-family: var(--font-mono); }
+  .feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; }
+  .feature-card {
+    background: var(--paper-raised); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 20px; display: flex; flex-direction: column; gap: 8px;
+  }
+  .feature-card .tag {
+    font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase;
+    color: var(--accent-strong); font-weight: 600;
+  }
+  .feature-card h3 { font-size: 1rem; font-weight: 600; }
+  .feature-card p { margin: 0; color: var(--text-dim); font-size: 0.88rem; }
 
   /* ---- code block ---- */
-  .code-panel { border: 2px solid var(--line); background: var(--code-bg); }
+  .code-panel {
+    background: var(--code-bg); border-radius: var(--radius); box-shadow: var(--shadow);
+    overflow: hidden;
+  }
   .code-panel .code-head {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 9px 16px; border-bottom: 2px solid var(--line);
-    font-family: var(--font-mono); font-size: 0.74rem; color: #7f97b3;
+    padding: 10px 16px; border-bottom: 1px solid rgba(255,255,255,0.08);
+    font-family: var(--font-mono); font-size: 0.76rem; color: #9ba39c;
   }
   .code-panel pre { margin: 0; padding: 20px; overflow-x: auto; font-family: var(--font-mono); font-size: 0.83rem; line-height: 1.65; color: var(--code-text); }
-  .tok-kw { color: #ff9d63; }
-  .tok-str { color: #8fd6a6; }
-  .tok-cls { color: #b7a6f5; }
-  .tok-com { color: #6c839c; font-style: italic; }
-  .tok-fn { color: #5fd6b3; }
+  .tok-kw { color: #e2953f; }
+  .tok-str { color: #8fbf7f; }
+  .tok-cls { color: #8891e8; }
+  .tok-com { color: #767d78; font-style: italic; }
+  .tok-fn { color: #4fbf9f; }
 
   /* ---- adapter table ---- */
-  .table-wrap { overflow-x: auto; border: 2px solid var(--line); background: var(--panel-bg); }
-  table { border-collapse: collapse; width: 100%; min-width: 580px; font-size: 0.85rem; font-family: var(--font-mono); }
-  th, td { text-align: left; padding: 11px 16px; border-bottom: 1px solid var(--line-soft); }
-  th { font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-faint); font-weight: 600; border-bottom: 2px solid var(--line); }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--paper-raised); }
+  table { border-collapse: collapse; width: 100%; min-width: 560px; font-size: 0.88rem; }
+  th, td { text-align: left; padding: 12px 16px; border-bottom: 1px solid var(--line); }
+  th { font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.05em; text-transform: uppercase; color: var(--text-faint); font-weight: 600; }
   tr:last-child td { border-bottom: none; }
-  td.fam { font-weight: 600; }
-  .swatch { display: inline-block; width: 9px; height: 9px; margin-right: 8px; }
+  td.fam { font-family: var(--font-mono); font-weight: 600; }
+  .swatch { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }
+  code.inline { font-family: var(--font-mono); font-size: 0.85em; background: var(--accent-soft); color: var(--accent-strong); padding: 1px 6px; border-radius: 4px; }
 
   /* ---- testing ---- */
-  .test-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; border: 1px solid var(--line-soft); background: var(--line-soft); }
-  .test-card { background: var(--panel-bg); padding: 18px; }
-  .test-card .cmd { display: block; font-family: var(--font-mono); font-size: 0.82rem; background: var(--code-bg); color: var(--code-text); padding: 8px 12px; margin: 10px 0; }
-  .test-card p { color: var(--text-dim); font-size: 0.84rem; font-family: var(--font-mono); }
-  .test-card h3 { font-size: 0.88rem; }
+  .test-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+  .test-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; background: var(--paper-raised); }
+  .test-card .cmd { display: block; font-family: var(--font-mono); font-size: 0.84rem; background: var(--code-bg); color: var(--code-text); padding: 9px 12px; border-radius: 6px; margin: 10px 0; }
+  .test-card p { margin: 0; color: var(--text-dim); font-size: 0.86rem; }
+  .test-card h3 { font-size: 0.92rem; }
 
-  /* ---- footer / stamp ---- */
-  footer { padding-block: 30px 50px; }
-  .stamp { border: 2px solid var(--line); display: flex; flex-wrap: wrap; }
-  .stamp .cell { padding: 12px 18px; border-right: 1px solid var(--line-soft); flex: 1; min-width: 140px; }
-  .stamp .cell:last-child { border-right: none; }
-  .stamp .cell .k { display: block; font-size: 0.64rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-faint); }
-  .stamp .cell .v { display: block; margin-top: 4px; font-size: 0.86rem; color: var(--text); }
-  .stamp .cell a { color: var(--text) !important; text-decoration: none; }
-  .stamp .cell a:hover { color: var(--accent-strong) !important; }
+  /* ---- footer ---- */
+  footer { padding-block: 34px 50px; }
+  .foot-grid { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
+  .foot-links { display: flex; gap: 18px; font-size: 0.85rem; }
+  .foot-links a { color: var(--text-dim); text-decoration: none; }
+  .foot-links a:hover { color: var(--accent-strong); }
+  .foot-meta { font-family: var(--font-mono); font-size: 0.78rem; color: var(--text-faint); }
 
   @media (max-width: 760px) {
     .hero-grid { grid-template-columns: 1fr; }
@@ -244,47 +211,28 @@
     .feature-grid { grid-template-columns: 1fr 1fr; }
     .test-grid { grid-template-columns: 1fr; }
     .nav-links { display: none; }
-    .tb-fields { display: none; }
-    .stamp { flex-direction: column; }
-    .stamp .cell { border-right: none; border-bottom: 1px solid var(--line-soft); }
-    .stamp .cell:last-child { border-bottom: none; }
   }
   @media (max-width: 440px) {
     .feature-grid { grid-template-columns: 1fr; }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .pulse-anim { animation: none !important; }
+    .hub-pulse, .pulse-anim { animation: none !important; }
   }
 </style>
 </head>
 <body>
 
-
-<nav class="titleblock">
+<nav class="nav">
   <div class="wrap">
-    <a class="brand" href="#top">
-      <svg class="brand-mark" viewBox="0 0 22 22" aria-hidden="true">
-        <circle cx="11" cy="11" r="9" fill="none" stroke="var(--accent)" stroke-width="1.6"/>
-        <path d="M11 2 V20 M2 11 H20" stroke="var(--accent)" stroke-width="1.2"/>
-        <circle cx="11" cy="11" r="2.6" fill="var(--accent)"/>
-      </svg>
-      <span class="brand-name">nexusdb</span>
-    </a>
+    <a class="brand" href="#top"><span class="dot"></span>nexusdb</a>
     <div class="nav-links">
       <a href="#why">Why</a>
       <a href="#architecture">Architecture</a>
       <a href="#features">Features</a>
       <a href="#quickstart">Quickstart</a>
       <a href="#adapters">Adapters</a>
-    </div>
-    <div style="display:flex; align-items:center; gap:14px;">
-      <div class="tb-fields">
-        <div class="tb-field"><span class="k">REV</span><span class="v">0.1.0</span></div>
-        <div class="tb-field"><span class="k">LIC</span><span class="v">MIT</span></div>
-        <div class="tb-field"><span class="k">LANG</span><span class="v">PY 3.11+</span></div>
-      </div>
-      <a class="btn-gh" href="https://github.com/ayal408/nexusdb" target="_blank" rel="noopener">GITHUB ↗</a>
+      <a class="nav-cta" href="https://github.com/ayal408/nexusdb" target="_blank" rel="noopener">GitHub ↗</a>
     </div>
   </div>
 </nav>
@@ -293,11 +241,11 @@
   <section class="hero" style="border-top:none;">
     <div class="hero-grid">
       <div>
-        <span class="sheet-note">Dwg. Set — Data Access Layer</span>
-        <h1>One repository<br>interface.<br><span class="hl">Three database<br>families.</span></h1>
+        <span class="eyebrow">Python · async · MIT licensed</span>
+        <h1>One repository interface.<br><span class="hl">Three kinds of database.</span></h1>
         <p class="lead">nexusdb gives PostgreSQL, MySQL, SQLite, MongoDB, and Qdrant the same
           repository &amp; Unit-of-Work surface, the same exception hierarchy, and the same
-          retries, caching, and observability — so application code depends on an
+          retries, caching, and observability — so your application code depends on an
           abstraction, not a driver.</p>
         <div class="hero-actions">
           <a class="btn btn-primary" href="#quickstart">See the quickstart →</a>
@@ -305,77 +253,76 @@
         </div>
         <div class="install-line"><span class="prompt">$</span> pip install -e ".[dev]"</div>
       </div>
+      <div>
+        <svg class="hub-figure" viewBox="0 0 420 320" role="img" aria-label="A central nexusdb adapter connecting to relational, document, and vector databases">
+          <path class="hub-edge" d="M 210 150 C 150 120, 110 90, 78 66" />
+          <path class="hub-edge" d="M 210 150 C 150 170, 100 185, 70 190" />
+          <path class="hub-edge" d="M 230 150 C 290 120, 330 90, 358 66" />
+          <path class="hub-edge" d="M 230 150 C 290 170, 340 185, 366 190" />
+          <path class="hub-edge" d="M 220 168 C 220 210, 220 240, 220 268" />
 
-      <div class="figure">
-        <div class="figure-body">
-          <svg class="hub-figure" viewBox="0 0 420 300" role="img" aria-label="Schematic: a central nexusdb adapter wired to relational, document, and vector databases with right-angle connectors">
-            <path class="hub-edge" d="M 160 130 H 100 V 50 H 70" />
-            <path class="hub-edge" d="M 160 150 H 90 V 210 H 60" />
-            <path class="hub-edge" d="M 260 130 H 320 V 50 H 350" />
-            <path class="hub-edge" d="M 260 150 H 330 V 210 H 360" />
-            <path class="hub-edge" d="M 210 168 V 260" />
+          <circle class="hub-pulse" cx="0" cy="0" r="3.2" fill="var(--relational)">
+            <animateMotion dur="3.2s" repeatCount="indefinite" path="M 210 150 C 150 120, 110 90, 78 66" />
+          </circle>
+          <circle class="hub-pulse" cx="0" cy="0" r="3.2" fill="var(--relational)">
+            <animateMotion dur="3.6s" repeatCount="indefinite" path="M 210 150 C 150 170, 100 185, 70 190" />
+          </circle>
+          <circle class="hub-pulse" cx="0" cy="0" r="3.2" fill="var(--document)">
+            <animateMotion dur="3s" repeatCount="indefinite" path="M 230 150 C 290 120, 330 90, 358 66" />
+          </circle>
+          <circle class="hub-pulse" cx="0" cy="0" r="3.2" fill="var(--document)">
+            <animateMotion dur="3.4s" repeatCount="indefinite" path="M 230 150 C 290 170, 340 185, 366 190" />
+          </circle>
+          <circle class="hub-pulse" cx="0" cy="0" r="3.2" fill="var(--vector)">
+            <animateMotion dur="2.8s" repeatCount="indefinite" path="M 220 168 C 220 210, 220 240, 220 268" />
+          </circle>
 
-            <circle class="hub-tick" cx="70" cy="50" r="3.5" fill="var(--panel-bg)" />
-            <circle class="hub-tick" cx="60" cy="210" r="3.5" fill="var(--panel-bg)" />
-            <circle class="hub-tick" cx="350" cy="50" r="3.5" fill="var(--panel-bg)" />
-            <circle class="hub-tick" cx="360" cy="210" r="3.5" fill="var(--panel-bg)" />
-            <circle class="hub-tick" cx="210" cy="260" r="3.5" fill="var(--panel-bg)" />
+          <g class="hub-node">
+            <rect x="160" y="118" width="100" height="50" rx="9" fill="var(--accent)" />
+            <text x="210" y="148" text-anchor="middle" class="hub-core-label">nexusdb</text>
+          </g>
 
-            <circle r="3" fill="var(--relational)" class="pulse-anim">
-              <animateMotion dur="3.4s" repeatCount="indefinite" path="M 160 130 H 100 V 50 H 70" />
-            </circle>
-            <circle r="3" fill="var(--relational)" class="pulse-anim">
-              <animateMotion dur="3.8s" repeatCount="indefinite" path="M 160 150 H 90 V 210 H 60" />
-            </circle>
-            <circle r="3" fill="var(--document)" class="pulse-anim">
-              <animateMotion dur="3.1s" repeatCount="indefinite" path="M 260 130 H 320 V 50 H 350" />
-            </circle>
-            <circle r="3" fill="var(--document)" class="pulse-anim">
-              <animateMotion dur="3.6s" repeatCount="indefinite" path="M 260 150 H 330 V 210 H 360" />
-            </circle>
-            <circle r="3" fill="var(--vector)" class="pulse-anim">
-              <animateMotion dur="2.6s" repeatCount="indefinite" path="M 210 168 V 260" />
-            </circle>
+          <g class="hub-node">
+            <circle cx="60" cy="56" r="5" fill="var(--relational)" />
+            <text x="72" y="52" class="hub-label">PostgreSQL</text>
+            <text x="72" y="66" class="hub-sub">/ MySQL / SQLite</text>
+          </g>
+          <g class="hub-node">
+            <circle cx="52" cy="196" r="5" fill="var(--relational)" />
+            <text x="64" y="200" class="hub-label">read replicas</text>
+          </g>
 
-            <rect x="160" y="128" width="100" height="42" fill="none" stroke="var(--line)" stroke-width="2" />
-            <text x="210" y="154" text-anchor="middle" class="hub-core-label" fill="var(--text)">nexusdb</text>
+          <g class="hub-node">
+            <circle cx="368" cy="56" r="5" fill="var(--document)" />
+            <text x="290" y="52" text-anchor="end" class="hub-label">MongoDB</text>
+            <text x="290" y="66" text-anchor="end" class="hub-sub">via Motor</text>
+          </g>
+          <g class="hub-node">
+            <circle cx="378" cy="196" r="5" fill="var(--document)" />
+            <text x="300" y="200" text-anchor="end" class="hub-label">document store</text>
+          </g>
 
-            <rect x="40" y="34" width="60" height="32" fill="none" stroke="var(--relational)" stroke-width="1.4" />
-            <text x="70" y="24" text-anchor="middle" class="hub-label">POSTGRES</text>
-            <text x="70" y="54" text-anchor="middle" class="hub-sub">MySQL · SQLite</text>
-
-            <rect x="24" y="196" width="72" height="28" fill="none" stroke="var(--relational)" stroke-width="1.4" />
-            <text x="60" y="215" text-anchor="middle" class="hub-sub">read replicas</text>
-
-            <rect x="320" y="34" width="60" height="32" fill="none" stroke="var(--document)" stroke-width="1.4" />
-            <text x="350" y="24" text-anchor="middle" class="hub-label">MONGODB</text>
-            <text x="350" y="54" text-anchor="middle" class="hub-sub">via Motor</text>
-
-            <rect x="322" y="196" width="76" height="28" fill="none" stroke="var(--document)" stroke-width="1.4" />
-            <text x="360" y="215" text-anchor="middle" class="hub-sub">document store</text>
-
-            <rect x="176" y="244" width="68" height="32" fill="none" stroke="var(--vector)" stroke-width="1.4" />
-            <text x="210" y="266" text-anchor="middle" class="hub-label">QDRANT</text>
-            <text x="210" y="291" text-anchor="middle" class="hub-sub">similarity search</text>
-          </svg>
-        </div>
-        <div class="figure-caption"><span><b>FIG. 01</b> — Adapter topology</span><span>N.T.S.</span></div>
+          <g class="hub-node">
+            <circle cx="220" cy="280" r="5" fill="var(--vector)" />
+            <text x="220" y="302" text-anchor="middle" class="hub-label">Qdrant</text>
+            <text x="220" y="316" text-anchor="middle" class="hub-sub">similarity search</text>
+          </g>
+        </svg>
       </div>
     </div>
   </section>
 
   <section id="why">
-    <div class="section-head"><span class="sheet-num">§01</span>
-      <div>
-        <h2>Every backend, ad hoc — until now</h2>
-        <p>Most projects that touch more than one kind of database end up with per-backend,
-          copy-pasted data access code, inconsistent error handling, and no shared story for
-          retries, caching, multi-tenancy, or observability.</p>
-      </div>
+    <div class="section-head">
+      <span class="eyebrow">Why</span>
+      <h2>Every backend, ad hoc — until now</h2>
+      <p>Most projects that touch more than one kind of database end up with per-backend,
+        copy-pasted data access code, inconsistent error handling, and no shared story for
+        retries, caching, multi-tenancy, or observability.</p>
     </div>
     <div class="why-grid">
-      <div class="why-panel problem">
-        <div class="strip">Without nexusdb</div>
+      <div class="why-card problem">
+        <h3>WITHOUT NEXUSDB</h3>
         <ul>
           <li>A different try/except shape per driver — asyncpg errors don't look like pymongo errors</li>
           <li>Retry and backoff logic reinvented in every service that calls the database</li>
@@ -383,8 +330,8 @@
           <li>No consistent correlation ID between a log line and the query that caused it</li>
         </ul>
       </div>
-      <div class="why-panel solution">
-        <div class="strip">With nexusdb</div>
+      <div class="why-card solution">
+        <h3>WITH NEXUSDB</h3>
         <ul>
           <li>Every driver exception translated centrally into one <code class="inline">NexusDBError</code> hierarchy</li>
           <li>Circuit breaker + exponential backoff applied uniformly by the adapter layer</li>
@@ -396,65 +343,97 @@
   </section>
 
   <section id="architecture">
-    <div class="section-head"><span class="sheet-num">§02</span>
-      <div>
-        <h2>One package, one layout per concern</h2>
-        <p>Every domain entity is a Pydantic v2 model. Every mutating repository method supports
-          an idempotency key. Every raised error is a <code class="inline">NexusDBError</code>
-          subclass — driver exceptions never leak past the adapter boundary.</p>
-      </div>
+    <div class="section-head">
+      <span class="eyebrow">Architecture</span>
+      <h2>One package, one layout per concern</h2>
+      <p>Every domain entity is a Pydantic v2 model. Every mutating repository method supports
+        an idempotency key. Every raised error is a <code class="inline">NexusDBError</code>
+        subclass — driver exceptions never leak past the adapter boundary.</p>
     </div>
-    <div class="figure">
-      <div class="figure-body" style="overflow-x:auto;">
-<pre style="margin:0; font-family:var(--font-mono); font-size:0.82rem; line-height:1.72; color:var(--text);"><span>src/nexusdb/</span>
-<span style="color:var(--text-faint)">├── core/</span>          <span style="color:var(--text-faint)">settings, exception hierarchy, driver-error mapper,</span>
-<span style="color:var(--text-faint)">│                structlog config, correlation/tenant context</span>
-<span style="color:var(--text-faint)">├── interfaces/</span>    <span style="color:var(--text-faint)">AbstractDatabaseAdapter, AbstractRepository,</span>
-<span style="color:var(--text-faint)">│                AbstractUnitOfWork, AbstractCache, events/outbox</span>
-<span style="color:var(--text-faint)">├── adapters/</span>      <span style="color:var(--text-faint)">one package per backend family</span>
-<span style="color:var(--text-faint)">│   ├── </span><span style="color:var(--relational)">relational/</span>   <span style="color:var(--text-faint)">Postgres / MySQL / SQLite via async SQLAlchemy,</span>
-<span style="color:var(--text-faint)">│   │             read-write splitting across replicas</span>
-<span style="color:var(--text-faint)">│   ├── </span><span style="color:var(--document)">document/</span>     <span style="color:var(--text-faint)">MongoDB via Motor</span>
-<span style="color:var(--text-faint)">│   └── </span><span style="color:var(--vector)">vector/</span>       <span style="color:var(--text-faint)">Qdrant</span>
-<span style="color:var(--text-faint)">├── repositories/</span> <span style="color:var(--text-faint)">backend-specific AbstractRepository implementations</span>
-<span style="color:var(--text-faint)">├── uow/</span>           <span style="color:var(--text-faint)">Unit of Work implementations</span>
-<span style="color:var(--text-faint)">├── cache/</span>         <span style="color:var(--text-faint)">Redis-backed cache-aside implementation</span>
-<span style="color:var(--text-faint)">├── resilience/</span>    <span style="color:var(--text-faint)">circuit breaker + exponential-backoff retry</span>
-<span style="color:var(--text-faint)">├── events/</span>        <span style="color:var(--text-faint)">in-process dispatcher + transactional outbox</span>
-<span style="color:var(--text-faint)">├── observability/</span> <span style="color:var(--text-faint)">metrics, tracing, audit trail</span>
-<span style="color:var(--text-faint)">├── multitenancy/</span> <span style="color:var(--text-faint)">tenant isolation helpers</span>
-<span style="color:var(--text-faint)">├── factory/</span>       <span style="color:var(--text-faint)">DatabaseFactory — builds/owns every configured adapter</span>
-<span style="color:var(--text-faint)">├── models/</span>        <span style="color:var(--text-faint)">shared Pydantic base models (Entity, AuditRecord)</span>
-<span style="color:var(--text-faint)">└── cli/</span>           <span style="color:var(--text-faint)">`nexusdb` console script (init, health, schema create)</span></pre>
-      </div>
-      <div class="figure-caption"><span><b>FIG. 02</b> — Package layout</span><span>src/nexusdb</span></div>
+    <div class="tree-panel">
+<pre><span class="c-txt">src/nexusdb/</span>
+<span class="c-dim">├── core/</span>          <span class="c-dim">settings, exception hierarchy, driver-error mapper,</span>
+<span class="c-dim">│                structlog config, correlation/tenant context</span>
+<span class="c-dim">├── interfaces/</span>    <span class="c-dim">AbstractDatabaseAdapter, AbstractRepository,</span>
+<span class="c-dim">│                AbstractUnitOfWork, AbstractCache, events/outbox</span>
+<span class="c-dim">├── adapters/</span>      <span class="c-dim">one package per backend family</span>
+<span class="c-dim">│   ├── </span><span class="c-rel">relational/</span>   <span class="c-dim">Postgres / MySQL / SQLite via async SQLAlchemy,</span>
+<span class="c-dim">│   │             read-write splitting across replicas</span>
+<span class="c-dim">│   ├── </span><span class="c-doc">document/</span>     <span class="c-dim">MongoDB via Motor</span>
+<span class="c-dim">│   └── </span><span class="c-vec">vector/</span>       <span class="c-dim">Qdrant</span>
+<span class="c-dim">├── repositories/</span> <span class="c-dim">backend-specific AbstractRepository implementations</span>
+<span class="c-dim">├── uow/</span>           <span class="c-dim">Unit of Work implementations</span>
+<span class="c-dim">├── cache/</span>         <span class="c-dim">Redis-backed cache-aside implementation</span>
+<span class="c-dim">├── resilience/</span>    <span class="c-dim">circuit breaker + exponential-backoff retry</span>
+<span class="c-dim">├── events/</span>        <span class="c-dim">in-process dispatcher + transactional outbox</span>
+<span class="c-dim">├── observability/</span> <span class="c-dim">metrics, tracing, audit trail</span>
+<span class="c-dim">├── multitenancy/</span> <span class="c-dim">tenant isolation helpers</span>
+<span class="c-dim">├── factory/</span>       <span class="c-dim">DatabaseFactory — builds/owns every configured adapter</span>
+<span class="c-dim">├── models/</span>        <span class="c-dim">shared Pydantic base models (Entity, AuditRecord)</span>
+<span class="c-dim">└── cli/</span>           <span class="c-dim">`nexusdb` console script (init, health, schema create)</span></pre>
     </div>
   </section>
 
   <section id="features">
-    <div class="section-head"><span class="sheet-num">§03</span>
-      <div><h2>Enterprise concerns, handled once</h2></div>
+    <div class="section-head">
+      <span class="eyebrow">What's inside</span>
+      <h2>Enterprise concerns, handled once</h2>
     </div>
     <div class="feature-grid">
-      <div class="feature-card"><span class="tag">Data access</span><h3>Repository + Unit of Work</h3><p>The same CRUD and query surface across every backend, with atomic multi-write transactions via <code class="inline">SQLAlchemyUnitOfWork</code>.</p></div>
-      <div class="feature-card"><span class="tag">Consistency</span><h3>Savepoint bulk insert</h3><p>Partial bulk-insert success via savepoints, with task-local session binding that's safe under concurrent requests.</p></div>
-      <div class="feature-card"><span class="tag">Resilience</span><h3>Circuit breaker + backoff</h3><p>Exponential-backoff retry and a circuit breaker sit in front of every adapter call, tuned per connection.</p></div>
-      <div class="feature-card"><span class="tag">Multi-tenancy</span><h3>Transparent isolation</h3><p><code class="inline">TenantScopedRepository</code> injects tenant filtering automatically, driven by contextvar-based tenant context.</p></div>
-      <div class="feature-card"><span class="tag">Caching</span><h3>Redis cache-aside</h3><p>A drop-in cache-aside layer plus a generic idempotency-key manager for safe write retries.</p></div>
-      <div class="feature-card"><span class="tag">Events</span><h3>Dispatcher + outbox</h3><p>An in-process event dispatcher and a transactional outbox — in-memory or SQL table-backed — for reliable side effects.</p></div>
-      <div class="feature-card"><span class="tag">Observability</span><h3>OpenTelemetry + audit</h3><p>Metrics and tracing helpers out of the box, plus an audit trail recorder for every mutation.</p></div>
-      <div class="feature-card"><span class="tag">Logging</span><h3>Structured, correlated</h3><p>structlog with correlation IDs and automatic PII/secret masking, threaded through contextvars.</p></div>
-      <div class="feature-card"><span class="tag">Scaling reads</span><h3>Master/replica routing</h3><p>Weighted load balancing across read replicas for the relational adapters, configured per <code class="inline">ConnectionConfig</code>.</p></div>
+      <div class="feature-card">
+        <span class="tag">Data access</span>
+        <h3>Repository + Unit of Work</h3>
+        <p>The same CRUD and query surface across every backend, with atomic multi-write transactions via <code class="inline">SQLAlchemyUnitOfWork</code>.</p>
+      </div>
+      <div class="feature-card">
+        <span class="tag">Consistency</span>
+        <h3>Savepoint-based bulk insert</h3>
+        <p>Partial bulk-insert success via savepoints, with task-local session binding that's safe under concurrent requests.</p>
+      </div>
+      <div class="feature-card">
+        <span class="tag">Resilience</span>
+        <h3>Circuit breaker + backoff</h3>
+        <p>Exponential-backoff retry and a circuit breaker sit in front of every adapter call, tuned per connection.</p>
+      </div>
+      <div class="feature-card">
+        <span class="tag">Multi-tenancy</span>
+        <h3>Transparent tenant isolation</h3>
+        <p><code class="inline">TenantScopedRepository</code> injects tenant filtering automatically, driven by contextvar-based tenant context.</p>
+      </div>
+      <div class="feature-card">
+        <span class="tag">Caching</span>
+        <h3>Redis cache-aside</h3>
+        <p>A drop-in cache-aside layer plus a generic idempotency-key manager for safe write retries.</p>
+      </div>
+      <div class="feature-card">
+        <span class="tag">Events</span>
+        <h3>Dispatcher + outbox</h3>
+        <p>An in-process event dispatcher and a transactional outbox — in-memory or SQL table-backed — for reliable side effects.</p>
+      </div>
+      <div class="feature-card">
+        <span class="tag">Observability</span>
+        <h3>OpenTelemetry + audit trail</h3>
+        <p>Metrics and tracing helpers out of the box, plus an audit trail recorder for every mutation.</p>
+      </div>
+      <div class="feature-card">
+        <span class="tag">Logging</span>
+        <h3>Structured, correlated, masked</h3>
+        <p>structlog with correlation IDs and automatic PII/secret masking, threaded through contextvars.</p>
+      </div>
+      <div class="feature-card">
+        <span class="tag">Scaling reads</span>
+        <h3>Master/replica routing</h3>
+        <p>Weighted load balancing across read replicas for the relational adapters, configured per <code class="inline">ConnectionConfig</code>.</p>
+      </div>
     </div>
   </section>
 
   <section id="quickstart">
-    <div class="section-head"><span class="sheet-num">§04</span>
-      <div>
-        <h2>CRUD and a transaction, in one file</h2>
-        <p>No external services required — runs against an in-memory SQLite adapter. Full runnable
-          version at <code class="inline">examples/quickstart.py</code>.</p>
-      </div>
+    <div class="section-head">
+      <span class="eyebrow">Quickstart</span>
+      <h2>CRUD and a transaction, in one file</h2>
+      <p>No external services required — this runs against an in-memory SQLite adapter. The
+        full runnable version lives at <code class="inline">examples/quickstart.py</code>.</p>
     </div>
     <div class="code-panel">
       <div class="code-head"><span>quickstart.py</span><span>python examples/quickstart.py</span></div>
@@ -484,12 +463,15 @@ config = ConnectionConfig(
   </section>
 
   <section id="adapters">
-    <div class="section-head"><span class="sheet-num">§05</span>
-      <div><h2>Backends supported today</h2></div>
+    <div class="section-head">
+      <span class="eyebrow">Adapters</span>
+      <h2>Backends supported today</h2>
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Family</th><th>Backends</th><th>Driver</th><th>Install extra</th><th>Notable</th></tr></thead>
+        <thead>
+          <tr><th>Family</th><th>Backends</th><th>Driver</th><th>Install extra</th><th>Notable</th></tr>
+        </thead>
         <tbody>
           <tr>
             <td class="fam"><span class="swatch" style="background:var(--relational)"></span>Relational</td>
@@ -518,32 +500,46 @@ config = ConnectionConfig(
   </section>
 
   <section>
-    <div class="section-head"><span class="sheet-num">§06</span>
-      <div>
-        <h2>159 tests, 86%+ coverage</h2>
-        <p>Integration tests spin up real Postgres/MongoDB/Qdrant via Testcontainers and are
-          skipped automatically when Docker isn't reachable — <code class="inline">pytest -m unit</code>
-          never fails because of them.</p>
-      </div>
+    <div class="section-head">
+      <span class="eyebrow">Testing</span>
+      <h2>159 tests, 86%+ coverage</h2>
+      <p>Integration tests spin up real Postgres/MongoDB/Qdrant via Testcontainers and are
+        skipped automatically when Docker isn't reachable — <code class="inline">pytest -m unit</code>
+        never fails because of them.</p>
     </div>
     <div class="test-grid">
-      <div class="test-card"><h3>Unit</h3><span class="cmd">pytest -m unit</span><p>Fast, isolated tests against mocked adapters via pytest-mock. No external services.</p></div>
-      <div class="test-card"><h3>Integration</h3><span class="cmd">pytest -m integration</span><p>Real Postgres, MongoDB, and Qdrant containers via Testcontainers. Needs Docker.</p></div>
-      <div class="test-card"><h3>Everything</h3><span class="cmd">pytest</span><p>Runs the full suite; integration tests skip cleanly without Docker reachable.</p></div>
+      <div class="test-card">
+        <h3>Unit</h3>
+        <span class="cmd">pytest -m unit</span>
+        <p>Fast, isolated tests against mocked adapters via pytest-mock. No external services.</p>
+      </div>
+      <div class="test-card">
+        <h3>Integration</h3>
+        <span class="cmd">pytest -m integration</span>
+        <p>Real Postgres, MongoDB, and Qdrant containers via Testcontainers. Needs Docker.</p>
+      </div>
+      <div class="test-card">
+        <h3>Everything</h3>
+        <span class="cmd">pytest</span>
+        <p>Runs the full suite; integration tests skip cleanly without Docker reachable.</p>
+      </div>
     </div>
   </section>
 
   <footer>
-    <div class="stamp">
-      <div class="cell"><span class="k">Project</span><span class="v">nexusdb</span></div>
-      <div class="cell"><span class="k">Rev.</span><span class="v">0.1.0</span></div>
-      <div class="cell"><span class="k">License</span><span class="v"><a href="https://github.com/ayal408/nexusdb/blob/main/LICENSE" target="_blank" rel="noopener">MIT ↗</a></span></div>
-      <div class="cell"><span class="k">Source</span><span class="v"><a href="https://github.com/ayal408/nexusdb" target="_blank" rel="noopener">GitHub ↗</a></span></div>
-      <div class="cell"><span class="k">Changelog</span><span class="v"><a href="https://github.com/ayal408/nexusdb/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Notes ↗</a></span></div>
-      <div class="cell"><span class="k">Issues</span><span class="v"><a href="https://github.com/ayal408/nexusdb/issues" target="_blank" rel="noopener">Tracker ↗</a></span></div>
+    <div class="foot-grid">
+      <div>
+        <a class="brand" href="#top" style="margin-bottom:10px; display:inline-flex;"><span class="dot"></span>nexusdb</a>
+        <p class="foot-meta" style="margin-top:10px;">v0.1.0 · Python 3.11+ · MIT License</p>
+      </div>
+      <div class="foot-links">
+        <a href="https://github.com/ayal408/nexusdb" target="_blank" rel="noopener">GitHub</a>
+        <a href="https://github.com/ayal408/nexusdb/blob/main/CHANGELOG.md" target="_blank" rel="noopener">Changelog</a>
+        <a href="https://github.com/ayal408/nexusdb/issues" target="_blank" rel="noopener">Issues</a>
+        <a href="https://github.com/ayal408/nexusdb/blob/main/LICENSE" target="_blank" rel="noopener">License</a>
+      </div>
     </div>
   </footer>
 </div>
-
 </body>
 </html>
