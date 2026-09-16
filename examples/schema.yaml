@@ -1,0 +1,48 @@
+# Declarative table schema for `krossdb schema create --schema examples/schema.yaml`.
+#
+# An alternative to defining tables in SQLAlchemy Core code (see examples/quickstart.py):
+# describe tables, columns, foreign keys, and indexes here, and krossdb.schema builds a
+# real sqlalchemy.MetaData from it — correct DDL on Postgres, MySQL, and SQLite alike.
+
+tables:
+  - name: suppliers
+    columns:
+      - name: id
+        type: uuid
+        primary_key: true
+      - name: name
+        type: string
+        length: 120
+        required: true
+        unique: true
+      - name: created_at
+        type: datetime
+        required: true
+        default: now
+
+  - name: widgets
+    columns:
+      - name: id
+        type: uuid
+        primary_key: true
+      - name: supplier_id
+        type: uuid
+        required: true
+      - name: name
+        type: string
+        required: true
+        unique: true
+      - name: quantity
+        type: integer
+        required: true
+      - name: created_at
+        type: datetime
+        required: true
+        default: now
+    foreign_keys:
+      - columns: [supplier_id]
+        ref_table: suppliers
+        ref_columns: [id]
+        on_delete: CASCADE
+    indexes:
+      - columns: [supplier_id]

@@ -15,26 +15,42 @@ app = typer.Typer(no_args_is_help=True)
 @app.command("create")
 def create(
     connection: str = typer.Option(..., "--connection", help="Name of the relational connection to target"),
-    metadata_path: str = typer.Option(
-        ...,
+    metadata_path: str | None = typer.Option(
+        None,
         "--metadata",
         help="Import path to a sqlalchemy.MetaData instance, e.g. 'myapp.db:metadata'",
     ),
+    schema_path: Path | None = typer.Option(
+        None,
+        "--schema",
+        help="Path to a declarative YAML/JSON table schema (see krossdb.schema). "
+        "Alternative to --metadata; exactly one of the two must be given.",
+    ),
     config: Path = typer.Option(Path("krossdb.yaml"), "--config", "-c", help="Path to the connection config file"),
 ) -> None:
-    """Create every table declared on the given SQLAlchemy ``MetaData`` object."""
+    """Create every table declared on the given SQLAlchemy ``MetaData`` — or declarative schema file."""
 
     if not config.exists():
         typer.secho(f"Config file not found: {config}", fg=typer.colors.RED)
         raise typer.Exit(code=1)
 
-    module_path, _, attr = metadata_path.partition(":")
-    if not attr:
-        typer.secho("--metadata must be in the form 'module.path:attribute_name'", fg=typer.colors.RED)
+    if bool(metadata_path) == bool(schema_path):
+        typer.secho("Pass exactly one of --metadata or --schema", fg=typer.colors.RED)
         raise typer.Exit(code=1)
 
-    module = importlib.import_module(module_path)
-    metadata = getattr(module, attr)
+    if schema_path is not None:
+        from krossdb.schema import build_metadata, load_schema_config
+
+        metadata = build_metadata(load_schema_config(schema_path))
+    else:
+        assert metadata_path is not None
+        module_path, _, attr = metadata_path.partition(":")
+        if not attr:
+            typer.secho("--metadata must be in the form 'module.path:attribute_name'", fg=typer.colors.RED)
+            raise typer.Exit(code=1)
+
+        module = importlib.import_module(module_path)
+        metadata = getattr(module, attr)
 
     asyncio.run(_create_all(config, connection, metadata))
 

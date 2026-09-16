@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Added
+
+- `krossdb.schema`: declarative table definitions in YAML/JSON (tables, columns,
+  foreign keys, indexes) built into a real `sqlalchemy.MetaData` via
+  `build_metadata`/`load_schema_config`, so the same file produces correct DDL on
+  Postgres, MySQL, and SQLite. `krossdb schema create` now accepts `--schema` as an
+  alternative to `--metadata`.
+- Richer query filters: `Operator`, `FieldFilter`, and the `Specification` alias let
+  repository `find`/`count` express comparisons beyond equality (`gt`/`lt`/`in`/
+  `contains`/`is_null`/...), across the relational, document, and vector adapters and
+  tenant scoping.
+
 ## [0.1.0] - 2026-08-25
 
 ### Added

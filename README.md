@@ -95,6 +95,37 @@ See [`examples/quickstart.py`](examples/quickstart.py) for a complete, runnable
 version (table creation, CRUD, exception handling, and a transactional Unit
 of Work) — `python examples/quickstart.py` after `pip install -e ".[sqlite]"`.
 
+## Declarative schema
+
+Tables can also be described in YAML/JSON instead of SQLAlchemy Core code:
+
+```yaml
+# schema.yaml
+tables:
+  - name: widgets
+    columns:
+      - name: id
+        type: uuid
+        primary_key: true
+      - name: name
+        type: string
+        required: true
+        unique: true
+      - name: quantity
+        type: integer
+        required: true
+```
+
+```bash
+krossdb schema create --connection primary --schema schema.yaml --config krossdb.yaml
+```
+
+`krossdb.schema.build_metadata` turns this into a real `sqlalchemy.MetaData`, so the same
+file produces correct DDL on Postgres, MySQL, and SQLite. See
+[`examples/schema.yaml`](examples/schema.yaml) for a complete example with a foreign key
+and an index; `--metadata module.path:attribute_name` still works as before for
+code-defined `MetaData` objects — pass exactly one of `--schema` or `--metadata`.
+
 ## Testing
 
 ```bash
