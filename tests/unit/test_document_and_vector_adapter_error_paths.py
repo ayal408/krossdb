@@ -10,13 +10,13 @@ from __future__ import annotations
 
 import pytest
 
-from nexusdb.adapters.document.mongodb import MongoDBAdapter
-from nexusdb.adapters.relational.mysql import MySQLAdapter
-from nexusdb.adapters.relational.postgres import PostgresAdapter
-from nexusdb.adapters.vector.qdrant import QdrantAdapter
-from nexusdb.core.config import ConnectionConfig, NodeConfig
-from nexusdb.core.enums import DatabaseKind, HealthStatus, RoutingRole
-from nexusdb.core.exceptions import ConfigurationError
+from krossdb.adapters.document.mongodb import MongoDBAdapter
+from krossdb.adapters.relational.mysql import MySQLAdapter
+from krossdb.adapters.relational.postgres import PostgresAdapter
+from krossdb.adapters.vector.qdrant import QdrantAdapter
+from krossdb.core.config import ConnectionConfig, NodeConfig
+from krossdb.core.enums import DatabaseKind, HealthStatus, RoutingRole
+from krossdb.core.exceptions import ConfigurationError
 
 pytestmark = pytest.mark.unit
 

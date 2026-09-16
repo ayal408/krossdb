@@ -8,9 +8,9 @@ from typing import Any
 
 import pytest
 
-from nexusdb.core.exceptions import UnsupportedOperationError
-from nexusdb.core.logging import configure_logging
-from nexusdb.interfaces.repository import (
+from krossdb.core.exceptions import UnsupportedOperationError
+from krossdb.core.logging import configure_logging
+from krossdb.interfaces.repository import (
     AbstractRepository,
     BulkResult,
     FieldFilter,
@@ -20,7 +20,7 @@ from nexusdb.interfaces.repository import (
     Specification,
     _normalize_criteria,
 )
-from nexusdb.models.base import Entity
+from krossdb.models.base import Entity
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -84,7 +84,7 @@ class InMemoryWidgetRepository(AbstractRepository[Widget, uuid.UUID]):
         return entity
 
     async def update(self, id_: uuid.UUID, changes: Mapping[str, Any]) -> Widget:
-        from nexusdb.core.exceptions import RecordNotFoundError
+        from krossdb.core.exceptions import RecordNotFoundError
 
         current = self._store.get(id_)
         if current is None:

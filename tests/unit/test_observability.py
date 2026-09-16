@@ -10,8 +10,8 @@ from __future__ import annotations
 
 import pytest
 
-from nexusdb.observability.metrics import track_latency
-from nexusdb.observability.tracing import traced_operation
+from krossdb.observability.metrics import track_latency
+from krossdb.observability.tracing import traced_operation
 
 pytestmark = pytest.mark.unit
 

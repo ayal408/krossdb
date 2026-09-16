@@ -21,14 +21,14 @@ from sqlalchemy import Column, DateTime, Integer, MetaData, String, Table, Uuid,
 pytest.importorskip("asyncpg")
 pytest.importorskip("sqlalchemy.ext.asyncio")
 
-from nexusdb.adapters.relational.postgres import PostgresAdapter
-from nexusdb.core.config import ConnectionConfig, NodeConfig
-from nexusdb.core.enums import DatabaseKind, RoutingRole
-from nexusdb.core.exception_mapper import translate_exceptions
-from nexusdb.core.exceptions import DuplicateRecordError, RecordNotFoundError
-from nexusdb.models.base import Entity
-from nexusdb.repositories.relational_repository import SQLAlchemyRepository
-from nexusdb.uow.sqlalchemy_uow import SQLAlchemyUnitOfWork
+from krossdb.adapters.relational.postgres import PostgresAdapter
+from krossdb.core.config import ConnectionConfig, NodeConfig
+from krossdb.core.enums import DatabaseKind, RoutingRole
+from krossdb.core.exception_mapper import translate_exceptions
+from krossdb.core.exceptions import DuplicateRecordError, RecordNotFoundError
+from krossdb.models.base import Entity
+from krossdb.repositories.relational_repository import SQLAlchemyRepository
+from krossdb.uow.sqlalchemy_uow import SQLAlchemyUnitOfWork
 
 _metadata = MetaData()
 _widgets_table = Table(

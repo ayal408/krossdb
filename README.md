@@ -1,4 +1,4 @@
-# nexusdb
+# krossdb
 
 [![CI](https://github.com/ayal408/nexusdb/actions/workflows/ci.yml/badge.svg)](https://github.com/ayal408/nexusdb/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/krossdb.svg)](https://pypi.org/project/krossdb/)
@@ -10,23 +10,23 @@ interface and repository pattern over relational (PostgreSQL/MySQL/SQLite),
 document (MongoDB), and vector (Qdrant) databases.
 
 > Published on PyPI as [`krossdb`](https://pypi.org/project/krossdb/) — the
-> name `nexusdb` was already taken by an unrelated package. The Python
-> package you `import` is unaffected and remains `nexusdb`.
+> name `krossdb` was already taken by an unrelated package. The Python
+> package you `import` is unaffected and remains `krossdb`.
 
 ## Why
 
 Most projects that touch more than one kind of database end up with
 per-backend, ad-hoc data access code, inconsistent error handling, and no
-shared story for retries, caching, multi-tenancy, or observability. nexusdb
+shared story for retries, caching, multi-tenancy, or observability. krossdb
 gives every backend the same repository/Unit-of-Work surface, the same
 exception hierarchy, and the same resilience and observability behavior, so
-application code depends on `nexusdb`'s abstractions instead of a specific
+application code depends on `krossdb`'s abstractions instead of a specific
 driver.
 
 ## Architecture at a glance
 
 ```
-src/nexusdb/
+src/krossdb/
 ├── core/            settings, enums, the exception hierarchy, the driver
 │                     exception mapper, structlog config, correlation/tenant
 │                     context (contextvars)
@@ -46,11 +46,11 @@ src/nexusdb/
 ├── multitenancy/      tenant isolation helpers
 ├── factory/            DatabaseFactory: builds/owns every configured adapter
 ├── models/             shared Pydantic base models (Entity, AuditRecord)
-└── cli/                `nexusdb` console script (init, health, ...)
+└── cli/                `krossdb` console script (init, health, ...)
 ```
 
 Every domain entity is a Pydantic v2 model; every mutating repository method
-supports an idempotency key; every raised error is a `NexusDBError` subclass
+supports an idempotency key; every raised error is a `KrossDBError` subclass
 (driver exceptions are translated centrally in
 `core/exception_mapper.py`, never leaked to callers).
 
@@ -73,8 +73,8 @@ pip install -e ".[all]"          # everything
 ## Quickstart
 
 ```python
-from nexusdb import ConnectionConfig, DatabaseFactory, DatabaseKind, Entity, NodeConfig, RoutingRole
-from nexusdb.repositories.relational_repository import SQLAlchemyRepository
+from krossdb import ConnectionConfig, DatabaseFactory, DatabaseKind, Entity, NodeConfig, RoutingRole
+from krossdb.repositories.relational_repository import SQLAlchemyRepository
 
 class Widget(Entity):
     name: str

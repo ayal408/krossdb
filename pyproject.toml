@@ -9,7 +9,7 @@ description = "Enterprise-grade, multi-database unified interface & repository p
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
-authors = [{ name = "NexusDB Maintainers" }]
+authors = [{ name = "KrossDB Maintainers" }]
 keywords = [
     "database", "repository-pattern", "unit-of-work", "postgresql", "mysql",
     "sqlite", "mongodb", "qdrant", "vector-database", "async", "sqlalchemy",
@@ -74,7 +74,7 @@ dev = [
 ]
 
 [project.scripts]
-nexusdb = "nexusdb.cli.main:app"
+krossdb = "krossdb.cli.main:app"
 
 [project.urls]
 Homepage = "https://github.com/ayal408/nexusdb"
@@ -83,11 +83,11 @@ Changelog = "https://github.com/ayal408/nexusdb/blob/main/CHANGELOG.md"
 Issues = "https://github.com/ayal408/nexusdb/issues"
 
 [tool.hatch.build.targets.wheel]
-packages = ["src/nexusdb"]
+packages = ["src/krossdb"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
-addopts = "-ra --strict-markers --strict-config --cov=nexusdb --cov-report=term-missing:skip-covered"
+addopts = "-ra --strict-markers --strict-config --cov=krossdb --cov-report=term-missing:skip-covered"
 testpaths = ["tests"]
 asyncio_mode = "auto"
 markers = [
@@ -101,7 +101,7 @@ filterwarnings = [
 ]
 
 [tool.coverage.run]
-source = ["src/nexusdb"]
+source = ["src/krossdb"]
 branch = true
 omit = ["*/cli/*"]
 
@@ -141,7 +141,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"src/nexusdb/cli/commands/*.py" = ["ASYNC240"]  # CLI commands read small local config files synchronously by design
+"src/krossdb/cli/commands/*.py" = ["ASYNC240"]  # CLI commands read small local config files synchronously by design
 
 [tool.ruff.lint.isort]
-known-first-party = ["nexusdb"]
+known-first-party = ["krossdb"]

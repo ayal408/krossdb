@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nexusdb.cache.redis_cache import RedisCache
+from krossdb.cache.redis_cache import RedisCache
 
 pytestmark = pytest.mark.unit
 
@@ -38,13 +38,13 @@ def mock_client() -> MagicMock:
 
 @pytest.fixture
 def cache(mock_client: MagicMock) -> RedisCache:
-    return RedisCache(mock_client, key_prefix="nexusdb-test")
+    return RedisCache(mock_client, key_prefix="krossdb-test")
 
 
 async def test_get_prefixes_the_key(cache, mock_client):
     await cache.get("widgets:1")
 
-    mock_client.get.assert_awaited_once_with("nexusdb-test:widgets:1")
+    mock_client.get.assert_awaited_once_with("krossdb-test:widgets:1")
 
 
 async def test_get_returns_none_on_miss(cache, mock_client):
@@ -56,13 +56,13 @@ async def test_get_returns_none_on_miss(cache, mock_client):
 async def test_set_prefixes_key_and_passes_ttl(cache, mock_client):
     await cache.set("widgets:1", b"payload", ttl_seconds=60)
 
-    mock_client.set.assert_awaited_once_with("nexusdb-test:widgets:1", b"payload", ex=60)
+    mock_client.set.assert_awaited_once_with("krossdb-test:widgets:1", b"payload", ex=60)
 
 
 async def test_delete_prefixes_the_key(cache, mock_client):
     await cache.delete("widgets:1")
 
-    mock_client.delete.assert_awaited_once_with("nexusdb-test:widgets:1")
+    mock_client.delete.assert_awaited_once_with("krossdb-test:widgets:1")
 
 
 async def test_exists_returns_bool_not_raw_int(cache, mock_client):
@@ -73,7 +73,7 @@ async def test_exists_returns_bool_not_raw_int(cache, mock_client):
 
 async def test_clear_prefix_deletes_every_matching_key_and_returns_count(cache, mock_client):
     mock_client.scan_iter.return_value = FakeScanIter(
-        ["nexusdb-test:widgets:1", "nexusdb-test:widgets:2"]
+        ["krossdb-test:widgets:1", "krossdb-test:widgets:2"]
     )
 
     removed = await cache.clear_prefix("widgets")

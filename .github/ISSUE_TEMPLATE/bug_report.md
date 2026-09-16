@@ -1,6 +1,6 @@
 ---
 name: Bug report
-about: Report a problem with nexusdb
+about: Report a problem with krossdb
 title: ""
 labels: bug
 ---
@@ -16,7 +16,7 @@ definition is ideal).
 What you expected to happen instead.
 
 **Environment**
-- nexusdb version:
+- krossdb version:
 - Python version:
 - Database backend(s) involved:
 - OS:

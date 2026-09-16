@@ -1,12 +1,12 @@
 ---
 name: Feature request
-about: Suggest an idea for nexusdb
+about: Suggest an idea for krossdb
 title: ""
 labels: enhancement
 ---
 
 **What problem does this solve?**
-Describe the use case — what are you trying to do that nexusdb doesn't
+Describe the use case — what are you trying to do that krossdb doesn't
 support today?
 
 **Proposed API / behavior**

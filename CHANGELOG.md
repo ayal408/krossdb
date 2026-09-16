@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
-- Core: unified `NexusDBError` exception hierarchy with a central
+- Core: unified `KrossDBError` exception hierarchy with a central
   driver-error translation layer (`core/exception_mapper.py`), structlog
   logging with correlation IDs and automatic PII/secret masking,
   contextvar-based correlation/tenant context, Pydantic v2 settings.
@@ -28,6 +28,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Transparent multi-tenancy isolation (`TenantScopedRepository`).
 - Observability: OpenTelemetry metrics and tracing helpers, audit trail
   recorder.
-- Typer-based CLI (`nexusdb init` / `health` / `schema create`).
+- Typer-based CLI (`krossdb init` / `health` / `schema create`).
 - 159 tests (unit with mocked adapters via pytest-mock + integration against
   real Postgres/MongoDB/Qdrant via Testcontainers), 86%+ coverage.

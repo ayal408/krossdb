@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import pytest
 
-from nexusdb.core import exceptions as exc
-from nexusdb.core.exception_mapper import register_mapper, translate_exceptions, translate_sync
+from krossdb.core import exceptions as exc
+from krossdb.core.exception_mapper import register_mapper, translate_exceptions, translate_sync
 
 pytestmark = pytest.mark.unit
 
 
-def test_nexusdb_error_carries_context_and_cause():
+def test_krossdb_error_carries_context_and_cause():
     cause = ValueError("boom")
 
     error = exc.QueryError("query failed", cause=cause, context={"table": "users"})
@@ -39,7 +39,7 @@ def test_bulk_operation_error_tracks_failures_and_successes():
     assert error.failures == failures
 
 
-def test_translate_exceptions_passes_through_existing_nexusdb_errors():
+def test_translate_exceptions_passes_through_existing_krossdb_errors():
     with pytest.raises(exc.RecordNotFoundError), translate_exceptions(op="get"):
         raise exc.RecordNotFoundError("Widget", 1)
 
@@ -66,7 +66,7 @@ def test_custom_mapper_takes_priority_and_can_be_replaced():
     class FakeDriverError(Exception):
         pass
 
-    def mapper_v1(error: BaseException) -> exc.NexusDBError | None:
+    def mapper_v1(error: BaseException) -> exc.KrossDBError | None:
         if isinstance(error, FakeDriverError):
             return exc.AuthenticationError("v1 mapped")
         return None
@@ -77,7 +77,7 @@ def test_custom_mapper_takes_priority_and_can_be_replaced():
         assert isinstance(mapped, exc.AuthenticationError)
         assert mapped.message == "v1 mapped"
 
-        def mapper_v2(error: BaseException) -> exc.NexusDBError | None:
+        def mapper_v2(error: BaseException) -> exc.KrossDBError | None:
             if isinstance(error, FakeDriverError):
                 return exc.DuplicateRecordError("v2 mapped")
             return None
@@ -90,7 +90,7 @@ def test_custom_mapper_takes_priority_and_can_be_replaced():
 
 
 def test_buggy_mapper_does_not_break_translation():
-    def buggy_mapper(error: BaseException) -> exc.NexusDBError | None:
+    def buggy_mapper(error: BaseException) -> exc.KrossDBError | None:
         raise RuntimeError("mapper itself is broken")
 
     register_mapper("buggy_test", buggy_mapper)

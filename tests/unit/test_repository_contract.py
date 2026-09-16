@@ -10,7 +10,7 @@ import uuid
 
 import pytest
 
-from nexusdb.core.exceptions import RecordNotFoundError
+from krossdb.core.exceptions import RecordNotFoundError
 
 pytestmark = pytest.mark.unit
 

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from nexusdb.core.context import correlation_scope, tenant_scope
-from nexusdb.models.base import AuditRecord
-from nexusdb.observability.audit import AbstractAuditSink, AuditTrailRecorder
+from krossdb.core.context import correlation_scope, tenant_scope
+from krossdb.models.base import AuditRecord
+from krossdb.observability.audit import AbstractAuditSink, AuditTrailRecorder
 
 pytestmark = pytest.mark.unit
 

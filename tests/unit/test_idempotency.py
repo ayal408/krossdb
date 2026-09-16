@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from nexusdb.core.exceptions import IdempotencyConflictError
-from nexusdb.core.idempotency import IdempotencyManager
+from krossdb.core.exceptions import IdempotencyConflictError
+from krossdb.core.idempotency import IdempotencyManager
 
 pytestmark = pytest.mark.unit
 

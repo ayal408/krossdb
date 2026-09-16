@@ -15,12 +15,12 @@ import pytest_asyncio
 
 pytest.importorskip("qdrant_client")
 
-from nexusdb.adapters.vector.qdrant import QdrantAdapter
-from nexusdb.core.config import ConnectionConfig, NodeConfig
-from nexusdb.core.enums import DatabaseKind, RoutingRole
-from nexusdb.core.exceptions import RecordNotFoundError
-from nexusdb.models.base import Entity
-from nexusdb.repositories.vector_repository import QdrantRepository
+from krossdb.adapters.vector.qdrant import QdrantAdapter
+from krossdb.core.config import ConnectionConfig, NodeConfig
+from krossdb.core.enums import DatabaseKind, RoutingRole
+from krossdb.core.exceptions import RecordNotFoundError
+from krossdb.models.base import Entity
+from krossdb.repositories.vector_repository import QdrantRepository
 
 _COLLECTION = "widgets_it"
 

@@ -13,9 +13,9 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nexusdb.core.exceptions import RecordNotFoundError, UnsupportedOperationError
-from nexusdb.interfaces.repository import FieldFilter, Operator
-from nexusdb.repositories.document_repository import MongoDBRepository
+from krossdb.core.exceptions import RecordNotFoundError, UnsupportedOperationError
+from krossdb.interfaces.repository import FieldFilter, Operator
+from krossdb.repositories.document_repository import MongoDBRepository
 from tests.conftest import Widget
 
 pytestmark = pytest.mark.unit

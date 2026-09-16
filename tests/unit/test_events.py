@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from nexusdb.events.dispatcher import InMemoryEventDispatcher
-from nexusdb.events.outbox import InMemoryOutboxStore
-from nexusdb.interfaces.events import DomainEvent, OutboxRecord
+from krossdb.events.dispatcher import InMemoryEventDispatcher
+from krossdb.events.outbox import InMemoryOutboxStore
+from krossdb.interfaces.events import DomainEvent, OutboxRecord
 
 pytestmark = pytest.mark.unit
 

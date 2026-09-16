@@ -6,10 +6,10 @@ import asyncio
 
 import pytest
 
-from nexusdb.core.config import CircuitBreakerConfig
-from nexusdb.core.enums import CircuitState
-from nexusdb.core.exceptions import CircuitBreakerOpenError
-from nexusdb.resilience.circuit_breaker import CircuitBreaker
+from krossdb.core.config import CircuitBreakerConfig
+from krossdb.core.enums import CircuitState
+from krossdb.core.exceptions import CircuitBreakerOpenError
+from krossdb.resilience.circuit_breaker import CircuitBreaker
 
 pytestmark = pytest.mark.unit
 

@@ -15,13 +15,13 @@ import pytest_asyncio
 
 pytest.importorskip("motor")
 
-from nexusdb.adapters.document.mongodb import MongoDBAdapter
-from nexusdb.core.config import ConnectionConfig, NodeConfig
-from nexusdb.core.enums import DatabaseKind, RoutingRole
-from nexusdb.core.exception_mapper import translate_exceptions
-from nexusdb.core.exceptions import DuplicateRecordError, RecordNotFoundError
-from nexusdb.models.base import Entity
-from nexusdb.repositories.document_repository import MongoDBRepository
+from krossdb.adapters.document.mongodb import MongoDBAdapter
+from krossdb.core.config import ConnectionConfig, NodeConfig
+from krossdb.core.enums import DatabaseKind, RoutingRole
+from krossdb.core.exception_mapper import translate_exceptions
+from krossdb.core.exceptions import DuplicateRecordError, RecordNotFoundError
+from krossdb.models.base import Entity
+from krossdb.repositories.document_repository import MongoDBRepository
 
 
 class Widget(Entity):

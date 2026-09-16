@@ -2,7 +2,7 @@
 
 ## Reporting a Vulnerability
 
-If you discover a security vulnerability in nexusdb, please **do not** open a
+If you discover a security vulnerability in krossdb, please **do not** open a
 public issue. Instead, use GitHub's private vulnerability reporting:
 
 1. Go to the [Security tab](../../security/advisories/new) of this repository.
@@ -14,7 +14,7 @@ available, we'll coordinate disclosure and credit you in the release notes
 
 ## Scope
 
-nexusdb translates driver-level errors and builds parameterized queries, but
+krossdb translates driver-level errors and builds parameterized queries, but
 it does not sanitize or validate application-level data beyond what Pydantic
 model definitions enforce — that responsibility stays with the application.
 Vulnerabilities of particular interest:
@@ -22,8 +22,8 @@ Vulnerabilities of particular interest:
 - Any path where user-controlled input could reach a query as a raw string
   fragment instead of a bound parameter.
 - Sensitive data (credentials, tokens) leaking into logs despite the
-  masking in `nexusdb.core.logging`.
-- Multi-tenancy isolation bypasses in `nexusdb.multitenancy.context`.
+  masking in `krossdb.core.logging`.
+- Multi-tenancy isolation bypasses in `krossdb.multitenancy.context`.
 
 ## Supported Versions
 

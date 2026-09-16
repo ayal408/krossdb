@@ -1,4 +1,4 @@
-"""End-to-end nexusdb quickstart: define a model, wire up a SQLite-backed
+"""End-to-end krossdb quickstart: define a model, wire up a SQLite-backed
 repository through the DatabaseFactory, and exercise CRUD + a transactional
 Unit of Work.
 
@@ -15,18 +15,18 @@ import asyncio
 
 from sqlalchemy import Column, DateTime, Integer, MetaData, String, Table, Uuid
 
-from nexusdb import (
+from krossdb import (
     ConnectionConfig,
     DatabaseFactory,
     DatabaseKind,
     Entity,
-    NexusDBError,
+    KrossDBError,
     NodeConfig,
     RoutingRole,
     configure_logging,
 )
-from nexusdb.repositories.relational_repository import SQLAlchemyRepository
-from nexusdb.uow.sqlalchemy_uow import SQLAlchemyUnitOfWork
+from krossdb.repositories.relational_repository import SQLAlchemyRepository
+from krossdb.uow.sqlalchemy_uow import SQLAlchemyUnitOfWork
 
 
 # 1. Define the domain entity as a plain Pydantic model.
@@ -63,7 +63,7 @@ async def main() -> None:
     async with DatabaseFactory([config]) as factory:
         adapter = factory.get("primary")
 
-        # Create the table (one-time schema setup; the CLI's `nexusdb schema
+        # Create the table (one-time schema setup; the CLI's `krossdb schema
         # create` command does this against a real deployment).
         async with adapter.acquire() as session:
             await session.run_sync(lambda s: metadata.create_all(s.connection()))
@@ -80,10 +80,10 @@ async def main() -> None:
         updated = await repo.update(widget.id, {"quantity": 25})
         print(f"updated: {updated}")
 
-        # --- exceptions are always NexusDBError subclasses -------------------
+        # --- exceptions are always KrossDBError subclasses -------------------
         try:
             await repo.create(Widget(name="gizmo", quantity=1))  # duplicate name
-        except NexusDBError as exc:
+        except KrossDBError as exc:
             print(f"expected failure: {type(exc).__name__}: {exc}")
 
         # --- an atomic transaction spanning multiple writes -------------------

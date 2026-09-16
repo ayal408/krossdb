@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from nexusdb.core.exceptions import NoActiveTransactionError, TransactionAlreadyActiveError
-from nexusdb.interfaces.events import DomainEvent
-from nexusdb.interfaces.unit_of_work import AbstractUnitOfWork
+from krossdb.core.exceptions import NoActiveTransactionError, TransactionAlreadyActiveError
+from krossdb.interfaces.events import DomainEvent
+from krossdb.interfaces.unit_of_work import AbstractUnitOfWork
 
 pytestmark = pytest.mark.unit
 

@@ -6,9 +6,9 @@ import json
 
 import pytest
 
-from nexusdb.core.context import correlation_scope, get_correlation_id, get_tenant_id, tenant_scope
-from nexusdb.core.exceptions import TenantContextMissingError
-from nexusdb.core.logging import configure_logging, get_logger
+from krossdb.core.context import correlation_scope, get_correlation_id, get_tenant_id, tenant_scope
+from krossdb.core.exceptions import TenantContextMissingError
+from krossdb.core.logging import configure_logging, get_logger
 
 pytestmark = pytest.mark.unit
 

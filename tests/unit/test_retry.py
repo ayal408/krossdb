@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from nexusdb.core.config import RetryConfig
-from nexusdb.core.exceptions import ConnectionError_, IntegrityViolationError
-from nexusdb.resilience.retry import with_retry
+from krossdb.core.config import RetryConfig
+from krossdb.core.exceptions import ConnectionError_, IntegrityViolationError
+from krossdb.resilience.retry import with_retry
 
 pytestmark = pytest.mark.unit
 

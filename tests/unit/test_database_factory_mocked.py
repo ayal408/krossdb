@@ -11,11 +11,11 @@ from __future__ import annotations
 
 import pytest
 
-from nexusdb.core.config import ConnectionConfig, NodeConfig
-from nexusdb.core.enums import DatabaseKind, HealthStatus, RoutingRole
-from nexusdb.core.exceptions import ConfigurationError
-from nexusdb.factory.db_factory import DatabaseFactory, register_adapter
-from nexusdb.interfaces.adapter import AbstractDatabaseAdapter, HealthCheckResult
+from krossdb.core.config import ConnectionConfig, NodeConfig
+from krossdb.core.enums import DatabaseKind, HealthStatus, RoutingRole
+from krossdb.core.exceptions import ConfigurationError
+from krossdb.factory.db_factory import DatabaseFactory, register_adapter
+from krossdb.interfaces.adapter import AbstractDatabaseAdapter, HealthCheckResult
 
 pytestmark = pytest.mark.unit
 

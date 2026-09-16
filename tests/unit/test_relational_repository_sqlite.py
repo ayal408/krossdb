@@ -19,18 +19,18 @@ import pytest
 import pytest_asyncio
 from sqlalchemy import Column, DateTime, Integer, MetaData, String, Table, Uuid
 
-from nexusdb.adapters.relational.sqlite import SQLiteAdapter
-from nexusdb.core.config import ConnectionConfig, NodeConfig
-from nexusdb.core.enums import DatabaseKind, RoutingRole
-from nexusdb.core.exceptions import (
+from krossdb.adapters.relational.sqlite import SQLiteAdapter
+from krossdb.core.config import ConnectionConfig, NodeConfig
+from krossdb.core.enums import DatabaseKind, RoutingRole
+from krossdb.core.exceptions import (
     DuplicateRecordError,
     RecordNotFoundError,
     UnsupportedOperationError,
 )
-from nexusdb.interfaces.repository import FieldFilter, Operator
-from nexusdb.models.base import Entity
-from nexusdb.repositories.relational_repository import SQLAlchemyRepository
-from nexusdb.uow.sqlalchemy_uow import SQLAlchemyUnitOfWork
+from krossdb.interfaces.repository import FieldFilter, Operator
+from krossdb.models.base import Entity
+from krossdb.repositories.relational_repository import SQLAlchemyRepository
+from krossdb.uow.sqlalchemy_uow import SQLAlchemyUnitOfWork
 
 pytestmark = pytest.mark.unit
 

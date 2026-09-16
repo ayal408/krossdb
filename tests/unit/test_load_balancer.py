@@ -6,8 +6,8 @@ from collections import Counter
 
 import pytest
 
-from nexusdb.adapters.relational.routing import LoadBalancer
-from nexusdb.core.exceptions import ConfigurationError
+from krossdb.adapters.relational.routing import LoadBalancer
+from krossdb.core.exceptions import ConfigurationError
 
 pytestmark = pytest.mark.unit
 

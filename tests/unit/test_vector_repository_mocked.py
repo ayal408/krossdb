@@ -12,10 +12,10 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from nexusdb.core.exceptions import RecordNotFoundError, UnsupportedOperationError
-from nexusdb.interfaces.repository import FieldFilter, Operator
-from nexusdb.models.base import Entity
-from nexusdb.repositories.vector_repository import QdrantRepository
+from krossdb.core.exceptions import RecordNotFoundError, UnsupportedOperationError
+from krossdb.interfaces.repository import FieldFilter, Operator
+from krossdb.models.base import Entity
+from krossdb.repositories.vector_repository import QdrantRepository
 
 pytestmark = pytest.mark.unit
 

@@ -6,9 +6,9 @@ import uuid
 
 import pytest
 
-from nexusdb.core.context import tenant_scope
-from nexusdb.core.exceptions import CrossTenantAccessError, TenantContextMissingError
-from nexusdb.multitenancy.context import TenantScopedRepository
+from krossdb.core.context import tenant_scope
+from krossdb.core.exceptions import CrossTenantAccessError, TenantContextMissingError
+from krossdb.multitenancy.context import TenantScopedRepository
 
 pytestmark = pytest.mark.unit
 
@@ -53,7 +53,7 @@ async def test_update_on_another_tenants_record_raises_not_found(scoped_reposito
         created = await scoped_repository.create(make_widget(name="owned"))
 
     with tenant_scope("tenant-b"):
-        from nexusdb.core.exceptions import RecordNotFoundError
+        from krossdb.core.exceptions import RecordNotFoundError
 
         with pytest.raises(RecordNotFoundError):
             await scoped_repository.update(created.id, {"name": "hijacked"})
