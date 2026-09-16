@@ -77,10 +77,10 @@ dev = [
 krossdb = "krossdb.cli.main:app"
 
 [project.urls]
-Homepage = "https://github.com/ayal408/nexusdb"
-Repository = "https://github.com/ayal408/nexusdb"
-Changelog = "https://github.com/ayal408/nexusdb/blob/main/CHANGELOG.md"
-Issues = "https://github.com/ayal408/nexusdb/issues"
+Homepage = "https://github.com/ayal408/krossdb"
+Repository = "https://github.com/ayal408/krossdb"
+Changelog = "https://github.com/ayal408/krossdb/blob/main/CHANGELOG.md"
+Issues = "https://github.com/ayal408/krossdb/issues"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/krossdb"]

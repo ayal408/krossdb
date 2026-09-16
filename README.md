@@ -1,6 +1,6 @@
 # krossdb
 
-[![CI](https://github.com/ayal408/nexusdb/actions/workflows/ci.yml/badge.svg)](https://github.com/ayal408/nexusdb/actions/workflows/ci.yml)
+[![CI](https://github.com/ayal408/krossdb/actions/workflows/ci.yml/badge.svg)](https://github.com/ayal408/krossdb/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/krossdb.svg)](https://pypi.org/project/krossdb/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue.svg)](pyproject.toml)
