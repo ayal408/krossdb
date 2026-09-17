@@ -18,6 +18,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   repository `find`/`count` express comparisons beyond equality (`gt`/`lt`/`in`/
   `contains`/`is_null`/...), across the relational, document, and vector adapters and
   tenant scoping.
+- Optional `migrations` extra (`pip install krossdb[migrations]`, pulled in by
+  `dev` and `all`) adding real Alembic-based migration tooling on top of the
+  existing one-shot `krossdb schema create`.
+- `krossdb.migrations.configure()` — a helper a consuming app's own
+  `alembic/env.py` calls to resolve Alembic's database URL and target
+  `MetaData` from krossdb's own `krossdb.yaml` config (via the same
+  `module.path:attribute_name` import convention as `schema create`) instead
+  of a hardcoded `sqlalchemy.url` in `alembic.ini`. Converts the async DSN a
+  krossdb `ConnectionConfig` carries (`postgresql+asyncpg://`,
+  `mysql+asyncmy://`, `sqlite+aiosqlite://`) to a sync-capable one, since
+  Alembic drives migrations through a sync SQLAlchemy engine.
+- `krossdb schema init-migrations` CLI command: scaffolds a starter
+  `alembic.ini` + `alembic/env.py` + `alembic/script.py.mako` +
+  `alembic/versions/` pre-wired to `krossdb.migrations.configure()`, so
+  day-to-day migration work (`alembic revision --autogenerate`, `alembic
+  upgrade head`, `alembic downgrade`, `alembic history`) goes through
+  Alembic's own CLI as usual.
 
 ## [0.1.0] - 2026-08-25
 
