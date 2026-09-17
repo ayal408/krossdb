@@ -46,7 +46,8 @@ src/krossdb/
 ├── multitenancy/      tenant isolation helpers
 ├── factory/            DatabaseFactory: builds/owns every configured adapter
 ├── models/             shared Pydantic base models (Entity, AuditRecord)
-└── cli/                `krossdb` console script (init, health, ...)
+├── migrations/         optional Alembic env.py wiring (see `migrations` extra)
+└── cli/                `krossdb` console script (init, health, schema, ...)
 ```
 
 Every domain entity is a Pydantic v2 model; every mutating repository method
@@ -125,6 +126,23 @@ file produces correct DDL on Postgres, MySQL, and SQLite. See
 [`examples/schema.yaml`](examples/schema.yaml) for a complete example with a foreign key
 and an index; `--metadata module.path:attribute_name` still works as before for
 code-defined `MetaData` objects — pass exactly one of `--schema` or `--metadata`.
+
+## CLI
+
+```bash
+krossdb init                     # scaffold a starter krossdb.yaml
+krossdb health                   # connect to every configured database and report status
+krossdb schema create            # metadata.create_all() against a configured connection
+krossdb schema init-migrations   # scaffold an Alembic project wired to krossdb.yaml
+                                  # (requires `pip install krossdb[migrations]`)
+```
+
+`schema init-migrations` scaffolds `alembic.ini` + `alembic/` pre-wired to
+read the database URL and target `MetaData` from `krossdb.yaml` instead of a
+hardcoded `sqlalchemy.url`; day-to-day migration work still goes through
+Alembic's own CLI (`alembic revision --autogenerate`, `alembic upgrade head`,
+...). See `krossdb schema init-migrations --help` and
+`krossdb.migrations.configure` for details.
 
 ## Testing
 

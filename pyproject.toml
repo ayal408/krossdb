@@ -51,15 +51,16 @@ sqlite = ["aiosqlite>=0.20"]
 mongodb = ["motor>=3.7.1", "pymongo>=4.7"]
 vector = ["qdrant-client>=1.9"]
 cache = ["redis[hiredis]>=8.1.0"]
+migrations = ["alembic>=1.13"]
 otel-exporters = [
     "opentelemetry-exporter-otlp>=1.25",
     "opentelemetry-instrumentation-sqlalchemy>=0.65b0",
 ]
 all = [
-    "krossdb[postgres,mysql,sqlite,mongodb,vector,cache,otel-exporters]",
+    "krossdb[postgres,mysql,sqlite,mongodb,vector,cache,migrations,otel-exporters]",
 ]
 dev = [
-    "krossdb[sqlite,mongodb,vector,cache]",
+    "krossdb[sqlite,mongodb,vector,cache,migrations]",
     "pytest>=8.2",
     "pytest-asyncio>=0.23",
     "pytest-mock>=3.14",
@@ -124,6 +125,10 @@ explicit_package_bases = true
 
 [[tool.mypy.overrides]]
 module = ["asyncpg", "asyncpg.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["alembic", "alembic.*"]
 ignore_missing_imports = true
 
 [tool.ruff]
