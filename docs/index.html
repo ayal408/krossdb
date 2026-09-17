@@ -370,7 +370,8 @@
 <span class="c-dim">├── multitenancy/</span> <span class="c-dim">tenant isolation helpers</span>
 <span class="c-dim">├── factory/</span>       <span class="c-dim">DatabaseFactory — builds/owns every configured adapter</span>
 <span class="c-dim">├── models/</span>        <span class="c-dim">shared Pydantic base models (Entity, AuditRecord)</span>
-<span class="c-dim">└── cli/</span>           <span class="c-dim">`krossdb` console script (init, health, schema create)</span></pre>
+<span class="c-dim">├── migrations/</span>    <span class="c-dim">optional Alembic env.py wiring (`migrations` extra)</span>
+<span class="c-dim">└── cli/</span>           <span class="c-dim">`krossdb` console script (init, health, schema create/init-migrations)</span></pre>
     </div>
   </section>
 
@@ -424,6 +425,11 @@
         <span class="tag">Scaling reads</span>
         <h3>Master/replica routing</h3>
         <p>Weighted load balancing across read replicas for the relational adapters, configured per <code class="inline">ConnectionConfig</code>.</p>
+      </div>
+      <div class="feature-card">
+        <span class="tag">Migrations</span>
+        <h3>Alembic, pre-wired</h3>
+        <p><code class="inline">krossdb schema init-migrations</code> scaffolds a starter Alembic project that resolves its DB URL and target metadata from your own <code class="inline">krossdb.yaml</code> — no hardcoded <code class="inline">sqlalchemy.url</code>.</p>
       </div>
     </div>
   </section>
