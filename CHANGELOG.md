@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+
+- Bumped minimum versions of all runtime and dev dependencies to their
+  current releases (pydantic, SQLAlchemy, structlog, OpenTelemetry, tenacity,
+  rich, anyio, the database drivers, and the pytest/mypy/ruff/pre-commit
+  toolchain). Added an `ignore::ResourceWarning:pymongo.*` filter and
+  `-p no:unraisableexception` to `addopts` to suppress a benign unclosed-socket
+  warning that pymongo's lazy `pymongo.auth` import triggers under newer pytest.
+
 ### Added
 
 - `krossdb.schema`: declarative table definitions in YAML/JSON (tables, columns,

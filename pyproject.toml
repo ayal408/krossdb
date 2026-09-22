@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling>=1.32.0"]
+requires = ["hatchling>=1.32.4"]
 build-backend = "hatchling.build"
 
 [project]
@@ -26,34 +26,34 @@ classifiers = [
 
 dependencies = [
     # Data validation / settings
-    "pydantic>=2.7,<3.0",
+    "pydantic>=2.13,<3.0",
     "pydantic-settings>=2.15.0,<3.0",
     # Relational (async SQLAlchemy)
-    "sqlalchemy[asyncio]>=2.0.52,<3.0",
+    "sqlalchemy[asyncio]>=2.0.54,<3.0",
     # Observability
-    "structlog>=24.1",
-    "opentelemetry-api>=1.25",
+    "structlog>=25.1",
+    "opentelemetry-api>=1.44.0",
     "opentelemetry-sdk>=1.44.0",
     # Resilience
-    "tenacity>=8.3",
+    "tenacity>=9.1",
     # CLI
     "typer>=0.27.2",
-    "rich>=13.7",
+    "rich>=14.2",
     # Misc
-    "anyio>=4.3",
+    "anyio>=4.15",
     "pyyaml>=6.0.3",
 ]
 
 [project.optional-dependencies]
-postgres = ["asyncpg>=0.29"]
-mysql = ["asyncmy>=0.2.9"]
-sqlite = ["aiosqlite>=0.20"]
-mongodb = ["motor>=3.7.1", "pymongo>=4.7"]
-vector = ["qdrant-client>=1.9"]
+postgres = ["asyncpg>=0.31"]
+mysql = ["asyncmy>=0.2.15"]
+sqlite = ["aiosqlite>=0.21"]
+mongodb = ["motor>=3.7.1", "pymongo>=4.18"]
+vector = ["qdrant-client>=1.19"]
 cache = ["redis[hiredis]>=8.1.0"]
-migrations = ["alembic>=1.13"]
+migrations = ["alembic>=1.16"]
 otel-exporters = [
-    "opentelemetry-exporter-otlp>=1.25",
+    "opentelemetry-exporter-otlp>=1.44.0",
     "opentelemetry-instrumentation-sqlalchemy>=0.65b0",
 ]
 all = [
@@ -61,17 +61,17 @@ all = [
 ]
 dev = [
     "krossdb[sqlite,mongodb,vector,cache,migrations]",
-    "pytest>=8.2",
-    "pytest-asyncio>=0.23",
-    "pytest-mock>=3.14",
-    "pytest-cov>=5.0",
-    "testcontainers[postgres,mongodb,qdrant]>=4.10",
-    "mypy>=1.10",
+    "pytest>=8.4",
+    "pytest-asyncio>=1.0",
+    "pytest-mock>=3.15",
+    "pytest-cov>=6.0",
+    "testcontainers[postgres,mongodb,qdrant]>=4.13",
+    "mypy>=1.15",
     "types-PyYAML>=6.0.12.20260815",
-    "ruff>=0.5",
+    "ruff>=0.13",
     "faker>=40.38.0",
     "httpx>=0.28.1",
-    "pre-commit>=3.7",
+    "pre-commit>=4.0",
 ]
 
 [project.scripts]
@@ -88,7 +88,7 @@ packages = ["src/krossdb"]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
-addopts = "-ra --strict-markers --strict-config --cov=krossdb --cov-report=term-missing:skip-covered"
+addopts = "-ra --strict-markers --strict-config -p no:unraisableexception --cov=krossdb --cov-report=term-missing:skip-covered"
 testpaths = ["tests"]
 asyncio_mode = "auto"
 markers = [
@@ -99,6 +99,7 @@ markers = [
 filterwarnings = [
     "error",
     "ignore::DeprecationWarning:google.*",
+    "ignore::ResourceWarning:pymongo.*",
 ]
 
 [tool.coverage.run]
