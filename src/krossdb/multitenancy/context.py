@@ -32,6 +32,22 @@ from krossdb.interfaces.repository import (
 )
 
 
+def _reject_tenant_id_reassignment(changes: Mapping[str, Any], tenant_id: str | None) -> None:
+    """Raise if ``changes`` attempts to move a record to a different (or no) tenant.
+
+    Without this, ``update``/``bulk_update`` would forward an attacker-supplied
+    ``tenant_id`` straight to the inner repository, letting the active tenant
+    silently reassign one of its own records to another tenant (or detach it
+    from tenancy entirely) despite every read path being tenant-scoped.
+    """
+
+    if "tenant_id" in changes and changes["tenant_id"] != tenant_id:
+        raise CrossTenantAccessError(
+            f"Cannot reassign tenant_id to {changes['tenant_id']!r} via update; "
+            f"the active tenant context is {tenant_id!r}"
+        )
+
+
 class TenantScopedRepository(AbstractRepository[TModel, TId]):
     """Wraps ``inner`` so every operation is transparently scoped to the current tenant.
 
@@ -82,6 +98,7 @@ class TenantScopedRepository(AbstractRepository[TModel, TId]):
 
     async def update(self, id_: TId, changes: Mapping[str, Any]) -> TModel:
         await self.get_by_id_or_raise(id_)  # raises RecordNotFoundError if not owned by this tenant
+        _reject_tenant_id_reassignment(changes, get_tenant_id(required=True))
         return await self._inner.update(id_, changes)
 
     async def delete(self, id_: TId) -> bool:
@@ -108,10 +125,21 @@ class TenantScopedRepository(AbstractRepository[TModel, TId]):
         self, entities: Sequence[TModel], *, idempotency_key: str | None = None
     ) -> BulkResult[TModel]:
         tenant_id = get_tenant_id(required=True)
+        for entity in entities:
+            existing_tenant = getattr(entity, "tenant_id", None)
+            if existing_tenant not in (None, tenant_id):
+                raise CrossTenantAccessError(
+                    f"Cannot create an entity pre-stamped with tenant_id={existing_tenant!r} "
+                    f"while the active tenant context is {tenant_id!r}"
+                )
         stamped = [e.model_copy(update={"tenant_id": tenant_id}) for e in entities]
         return await self._inner.bulk_create(stamped, idempotency_key=idempotency_key)
 
     async def bulk_update(self, updates: Mapping[TId, Mapping[str, Any]]) -> BulkResult[TModel]:
+        tenant_id = get_tenant_id(required=True)
+        for changes in updates.values():
+            _reject_tenant_id_reassignment(changes, tenant_id)
+
         owned: dict[TId, Mapping[str, Any]] = {}
         for id_, changes in updates.items():
             if await self.get_by_id(id_) is not None:
