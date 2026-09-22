@@ -119,6 +119,46 @@ async def test_update_missing_point_raises_record_not_found(repo, mock_client):
         await repo.update("missing", {"name": "x"})
 
 
+async def test_update_with_extra_criteria_uses_a_has_id_and_field_filter_selector(
+    repo, mock_client
+):
+    """extra_criteria becomes a server-side Filter (HasIdCondition + the
+    extra field conditions) passed as the points selector, not a separate
+    check before set_payload — this is what makes TenantScopedRepository's
+    writes atomic at the driver level (issue #35)."""
+    entity = _make_entity(tenant_id="tenant-a")
+    mock_client.retrieve.return_value = [_fake_point(entity)]
+
+    await repo.update(
+        entity.id,
+        {"name": "after"},
+        extra_criteria=[FieldFilter(field="tenant_id", operator=Operator.EQ, value="tenant-a")],
+    )
+
+    _, kwargs = mock_client.set_payload.call_args
+    selector = kwargs["points"]
+    assert selector.must[0].has_id == [str(entity.id)]
+    assert selector.must[1].key == "tenant_id"
+    assert selector.must[1].match.value == "tenant-a"
+
+
+async def test_update_with_extra_criteria_not_matching_the_point_raises_record_not_found(
+    repo, mock_client
+):
+    """The filtered set_payload is a no-op when extra_criteria doesn't
+    match, so the post-write refetch (still showing the foreign tenant_id)
+    must be treated as not-found rather than a successful update."""
+    entity = _make_entity(tenant_id="tenant-b")
+    mock_client.retrieve.return_value = [_fake_point(entity)]
+
+    with pytest.raises(RecordNotFoundError):
+        await repo.update(
+            entity.id,
+            {"name": "after"},
+            extra_criteria=[FieldFilter(field="tenant_id", operator=Operator.EQ, value="tenant-a")],
+        )
+
+
 async def test_delete_returns_false_when_point_does_not_exist(repo, mock_client):
     mock_client.retrieve.return_value = []
 
@@ -128,10 +168,30 @@ async def test_delete_returns_false_when_point_does_not_exist(repo, mock_client)
 
 async def test_delete_removes_existing_point(repo, mock_client):
     entity = _make_entity()
-    mock_client.retrieve.return_value = [_fake_point(entity)]
+    # delete() now re-fetches after the write to confirm it actually took
+    # effect: present on the pre-check, gone on the post-check.
+    mock_client.retrieve.side_effect = [[_fake_point(entity)], []]
 
     assert await repo.delete(entity.id) is True
     mock_client.delete.assert_awaited_once()
+
+
+async def test_delete_with_extra_criteria_not_matching_the_point_leaves_it_intact(
+    repo, mock_client
+):
+    entity = _make_entity(tenant_id="tenant-b")
+    # pre-check finds it; the filtered delete is a no-op; post-check still finds it.
+    mock_client.retrieve.side_effect = [[_fake_point(entity)], [_fake_point(entity)]]
+
+    deleted = await repo.delete(
+        entity.id,
+        extra_criteria=[FieldFilter(field="tenant_id", operator=Operator.EQ, value="tenant-a")],
+    )
+
+    assert deleted is False
+    _, kwargs = mock_client.delete.call_args
+    selector = kwargs["points_selector"]
+    assert selector.must[0].has_id == [str(entity.id)]
 
 
 async def test_find_returns_page_built_from_scroll_and_count(repo, mock_client):
@@ -260,3 +320,19 @@ async def test_bulk_delete_with_empty_ids_short_circuits(repo, mock_client):
 
     mock_client.delete.assert_not_awaited()
     assert deleted == 0
+
+
+async def test_bulk_delete_with_extra_criteria_only_deletes_matching_points(repo, mock_client):
+    owned = _make_entity(name="owned", tenant_id="tenant-a")
+    foreign = _make_entity(name="foreign", tenant_id="tenant-b")
+    mock_client.retrieve.return_value = [_fake_point(owned), _fake_point(foreign)]
+
+    deleted = await repo.bulk_delete(
+        [owned.id, foreign.id],
+        extra_criteria=[FieldFilter(field="tenant_id", operator=Operator.EQ, value="tenant-a")],
+    )
+
+    assert deleted == 1
+    _, kwargs = mock_client.delete.call_args
+    selector = kwargs["points_selector"]
+    assert selector.must[0].has_id == [str(owned.id)]

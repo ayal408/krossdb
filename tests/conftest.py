@@ -8,17 +8,14 @@ from typing import Any
 
 import pytest
 
-from krossdb.core.exceptions import UnsupportedOperationError
 from krossdb.core.logging import configure_logging
 from krossdb.interfaces.repository import (
     AbstractRepository,
     BulkResult,
-    FieldFilter,
-    Operator,
     Page,
     SortSpec,
     Specification,
-    _normalize_criteria,
+    _matches_criteria,
 )
 from krossdb.models.base import Entity
 
@@ -32,35 +29,6 @@ class Widget(Entity):
 
     name: str
     quantity: int = 0
-
-
-def _matches(widget: Widget, filt: FieldFilter) -> bool:
-    actual = getattr(widget, filt.field, None)
-    operator = filt.operator
-    value = filt.value
-    if operator is Operator.EQ:
-        return actual == value
-    if operator is Operator.NE:
-        return actual != value
-    if operator is Operator.GT:
-        return actual is not None and actual > value
-    if operator is Operator.GTE:
-        return actual is not None and actual >= value
-    if operator is Operator.LT:
-        return actual is not None and actual < value
-    if operator is Operator.LTE:
-        return actual is not None and actual <= value
-    if operator is Operator.IN:
-        return actual in value
-    if operator is Operator.NOT_IN:
-        return actual not in value
-    if operator is Operator.CONTAINS:
-        return actual is not None and str(value) in str(actual)
-    if operator is Operator.IS_NULL:
-        return (actual is None) is bool(value)
-    raise UnsupportedOperationError(
-        f"Operator {operator!r} is not supported by the in-memory repository"
-    )
 
 
 class InMemoryWidgetRepository(AbstractRepository[Widget, uuid.UUID]):
@@ -83,18 +51,31 @@ class InMemoryWidgetRepository(AbstractRepository[Widget, uuid.UUID]):
         self._store[entity.id] = entity
         return entity
 
-    async def update(self, id_: uuid.UUID, changes: Mapping[str, Any]) -> Widget:
+    async def update(
+        self,
+        id_: uuid.UUID,
+        changes: Mapping[str, Any],
+        *,
+        extra_criteria: Specification | None = None,
+    ) -> Widget:
         from krossdb.core.exceptions import RecordNotFoundError
 
         current = self._store.get(id_)
-        if current is None:
+        # Indistinguishable from "id doesn't exist" by design: mirrors every
+        # real backend adapter, which can't (and shouldn't) tell a caller
+        # whether a row exists under another tenant.
+        if current is None or (extra_criteria and not _matches_criteria(current, extra_criteria)):
             raise RecordNotFoundError("Widget", id_)
         updated = current.model_copy(update=dict(changes))
         self._store[id_] = updated
         return updated
 
-    async def delete(self, id_: uuid.UUID) -> bool:
-        return self._store.pop(id_, None) is not None
+    async def delete(self, id_: uuid.UUID, *, extra_criteria: Specification | None = None) -> bool:
+        current = self._store.get(id_)
+        if current is None or (extra_criteria and not _matches_criteria(current, extra_criteria)):
+            return False
+        del self._store[id_]
+        return True
 
     async def find(
         self,
@@ -104,9 +85,7 @@ class InMemoryWidgetRepository(AbstractRepository[Widget, uuid.UUID]):
         offset: int = 0,
         sort: Sequence[SortSpec] | None = None,
     ) -> Page[Widget]:
-        items = list(self._store.values())
-        for filt in _normalize_criteria(criteria):
-            items = [w for w in items if _matches(w, filt)]
+        items = [w for w in self._store.values() if _matches_criteria(w, criteria)]
         total = len(items)
         return Page(items=items[offset : offset + limit], total=total, limit=limit, offset=offset)
 
@@ -124,20 +103,25 @@ class InMemoryWidgetRepository(AbstractRepository[Widget, uuid.UUID]):
         return BulkResult(succeeded=succeeded)
 
     async def bulk_update(
-        self, updates: Mapping[uuid.UUID, Mapping[str, Any]]
+        self,
+        updates: Mapping[uuid.UUID, Mapping[str, Any]],
+        *,
+        extra_criteria: Specification | None = None,
     ) -> BulkResult[Widget]:
         succeeded, failed = [], {}
         for idx, (id_, changes) in enumerate(updates.items()):
             try:
-                succeeded.append(await self.update(id_, changes))
+                succeeded.append(await self.update(id_, changes, extra_criteria=extra_criteria))
             except Exception as exc:
                 failed[idx] = str(exc)
         return BulkResult(succeeded=succeeded, failed=failed)
 
-    async def bulk_delete(self, ids: Sequence[uuid.UUID]) -> int:
+    async def bulk_delete(
+        self, ids: Sequence[uuid.UUID], *, extra_criteria: Specification | None = None
+    ) -> int:
         deleted = 0
         for id_ in ids:
-            if await self.delete(id_):
+            if await self.delete(id_, extra_criteria=extra_criteria):
                 deleted += 1
         return deleted
 

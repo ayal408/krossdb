@@ -15,6 +15,7 @@ from typing import Any
 from qdrant_client.models import (
     FieldCondition,
     Filter,
+    HasIdCondition,
     IsNullCondition,
     MatchAny,
     MatchExcept,
@@ -38,6 +39,7 @@ from krossdb.interfaces.repository import (
     Specification,
     TId,
     TModel,
+    _matches_criteria,
     _normalize_criteria,
 )
 
@@ -88,6 +90,24 @@ def _add_condition(filt: FieldFilter, must: list[Any], must_not: list[Any]) -> N
         )
 
 
+def _points_selector(id_: TId, extra_criteria: Specification | None) -> Any:
+    """A points selector scoped to a single id, ANDing in ``extra_criteria`` if given.
+
+    Plain ``[str(id_)]`` (Qdrant's fast path) when there's nothing extra to
+    enforce; otherwise a server-side :class:`Filter` combining
+    :class:`HasIdCondition` with the extra conditions, so the mutation itself
+    is atomically scoped rather than relying on a prior, separate read.
+    """
+
+    if not extra_criteria:
+        return [str(id_)]
+    must: list[Any] = [HasIdCondition(has_id=[str(id_)])]
+    must_not: list[Any] = []
+    for filt in extra_criteria:
+        _add_condition(filt, must, must_not)
+    return Filter(must=must, must_not=must_not or None)
+
+
 class QdrantRepository(AbstractRepository[TModel, TId]):
     def __init__(self, adapter: QdrantAdapter, collection_name: str, model: type[TModel]) -> None:
         self.adapter = adapter
@@ -121,25 +141,40 @@ class QdrantRepository(AbstractRepository[TModel, TId]):
                 await client.upsert(self.collection_name, points=[point])
         return entity
 
-    async def update(self, id_: TId, changes: Mapping[str, Any]) -> TModel:
+    async def update(
+        self,
+        id_: TId,
+        changes: Mapping[str, Any],
+        *,
+        extra_criteria: Specification | None = None,
+    ) -> TModel:
+        selector = _points_selector(id_, extra_criteria)
         async with self.adapter.acquire() as client:
             with translate_exceptions(collection=self.collection_name, op="update"):
-                await client.set_payload(
-                    self.collection_name, payload=dict(changes), points=[str(id_)]
-                )
+                await client.set_payload(self.collection_name, payload=dict(changes), points=selector)
         updated = await self.get_by_id(id_)
-        if updated is None:
+        # A point failing extra_criteria means the filter-scoped set_payload
+        # above was a no-op (Qdrant doesn't report a matched-count for a
+        # Filter selector), so re-check here rather than trusting `updated`
+        # exists to mean the write applied. Indistinguishable from "id
+        # doesn't exist" by design: same reasoning as the relational/document
+        # adapters — must not leak that a point exists under another tenant.
+        if updated is None or (extra_criteria and not _matches_criteria(updated, extra_criteria)):
             raise RecordNotFoundError(self.model.__name__, id_)
         return updated
 
-    async def delete(self, id_: TId) -> bool:
+    async def delete(self, id_: TId, *, extra_criteria: Specification | None = None) -> bool:
         existing = await self.get_by_id(id_)
         if existing is None:
             return False
+        selector = _points_selector(id_, extra_criteria)
         async with self.adapter.acquire() as client:
             with translate_exceptions(collection=self.collection_name, op="delete"):
-                await client.delete(self.collection_name, points_selector=[str(id_)])
-        return True
+                await client.delete(self.collection_name, points_selector=selector)
+        # The delete call itself was already filter-scoped (a no-op if
+        # `existing` failed extra_criteria); this just reports whether it
+        # actually took effect.
+        return await self.get_by_id(id_) is None
 
     async def find(
         self,
@@ -183,23 +218,53 @@ class QdrantRepository(AbstractRepository[TModel, TId]):
                 await client.upsert(self.collection_name, points=points)
         return BulkResult(succeeded=list(entities))
 
-    async def bulk_update(self, updates: Mapping[TId, Mapping[str, Any]]) -> BulkResult[TModel]:
+    async def bulk_update(
+        self,
+        updates: Mapping[TId, Mapping[str, Any]],
+        *,
+        extra_criteria: Specification | None = None,
+    ) -> BulkResult[TModel]:
         succeeded: list[TModel] = []
         failed: dict[int, str] = {}
         for index, (id_, changes) in enumerate(updates.items()):
             try:
-                succeeded.append(await self.update(id_, changes))
+                succeeded.append(await self.update(id_, changes, extra_criteria=extra_criteria))
             except KrossDBError as exc:
                 failed[index] = str(exc)
         return BulkResult(succeeded=succeeded, failed=failed)
 
-    async def bulk_delete(self, ids: Sequence[TId]) -> int:
+    async def bulk_delete(
+        self, ids: Sequence[TId], *, extra_criteria: Specification | None = None
+    ) -> int:
         if not ids:
             return 0
+        if not extra_criteria:
+            async with self.adapter.acquire() as client:
+                with translate_exceptions(collection=self.collection_name, op="bulk_delete"):
+                    await client.delete(
+                        self.collection_name, points_selector=[str(i) for i in ids]
+                    )
+            return len(ids)  # Qdrant's delete doesn't report how many points actually existed
+
+        # extra_criteria given: resolve which ids actually satisfy it first
+        # (a single retrieve round-trip), so the returned count is exact
+        # instead of the unscoped fast path's optimistic len(ids), then issue
+        # one filter-scoped delete so the mutation stays atomically scoped
+        # even if a race narrows `owned_ids` further between the two calls.
         async with self.adapter.acquire() as client:
             with translate_exceptions(collection=self.collection_name, op="bulk_delete"):
-                await client.delete(self.collection_name, points_selector=[str(i) for i in ids])
-        return len(ids)  # Qdrant's delete doesn't report how many points actually existed
+                points = await client.retrieve(self.collection_name, ids=[str(i) for i in ids])
+                owned_ids = [
+                    p.id for p in points if _matches_criteria(self._point_to_model(p), extra_criteria)
+                ]
+                if owned_ids:
+                    must: list[Any] = [HasIdCondition(has_id=owned_ids)]
+                    must_not: list[Any] = []
+                    for filt in extra_criteria:
+                        _add_condition(filt, must, must_not)
+                    selector = Filter(must=must, must_not=must_not or None)
+                    await client.delete(self.collection_name, points_selector=selector)
+        return len(owned_ids)
 
     async def search(
         self,

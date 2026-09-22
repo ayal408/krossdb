@@ -10,7 +10,8 @@ import uuid
 
 import pytest
 
-from krossdb.core.exceptions import RecordNotFoundError
+from krossdb.core.exceptions import RecordNotFoundError, UnsupportedOperationError
+from krossdb.interfaces.repository import FieldFilter, Operator, _matches_criteria
 
 pytestmark = pytest.mark.unit
 
@@ -105,3 +106,137 @@ async def test_bulk_update_reports_partial_failure(widget_repository, make_widge
     assert result.success_count == 1
     assert result.failure_count == 1
     assert not result.all_succeeded
+
+
+# --------------------------------------------------------------------------
+# extra_criteria: the general write-scoping mechanism TenantScopedRepository
+# builds on (see krossdb.multitenancy.context and issue #35). Exercised here
+# against the in-memory reference repo; the real backends have their own
+# dedicated tests (test_relational_repository_sqlite.py against real SQL,
+# and the mocked document/vector suites).
+# --------------------------------------------------------------------------
+
+
+async def test_update_with_matching_extra_criteria_succeeds(widget_repository, make_widget):
+    widget = await widget_repository.create(make_widget(name="before", tenant_id="tenant-a"))
+
+    updated = await widget_repository.update(
+        widget.id,
+        {"name": "after"},
+        extra_criteria=[FieldFilter(field="tenant_id", operator=Operator.EQ, value="tenant-a")],
+    )
+
+    assert updated.name == "after"
+
+
+async def test_update_with_non_matching_extra_criteria_raises_and_leaves_row_untouched(
+    widget_repository, make_widget
+):
+    widget = await widget_repository.create(make_widget(name="before", tenant_id="tenant-a"))
+
+    with pytest.raises(RecordNotFoundError):
+        await widget_repository.update(
+            widget.id,
+            {"name": "after"},
+            extra_criteria=[FieldFilter(field="tenant_id", operator=Operator.EQ, value="tenant-b")],
+        )
+
+    untouched = await widget_repository.get_by_id(widget.id)
+    assert untouched.name == "before"
+
+
+async def test_delete_with_non_matching_extra_criteria_returns_false(widget_repository, make_widget):
+    widget = await widget_repository.create(make_widget(tenant_id="tenant-a"))
+
+    deleted = await widget_repository.delete(
+        widget.id,
+        extra_criteria=[FieldFilter(field="tenant_id", operator=Operator.EQ, value="tenant-b")],
+    )
+
+    assert deleted is False
+    assert await widget_repository.get_by_id(widget.id) is not None
+
+
+async def test_bulk_delete_with_extra_criteria_only_removes_matching_rows(
+    widget_repository, make_widget
+):
+    owned = await widget_repository.create(make_widget(tenant_id="tenant-a"))
+    foreign = await widget_repository.create(make_widget(tenant_id="tenant-b"))
+
+    deleted = await widget_repository.bulk_delete(
+        [owned.id, foreign.id],
+        extra_criteria=[FieldFilter(field="tenant_id", operator=Operator.EQ, value="tenant-a")],
+    )
+
+    assert deleted == 1
+    assert await widget_repository.get_by_id(owned.id) is None
+    assert await widget_repository.get_by_id(foreign.id) is not None
+
+
+# --------------------------------------------------------------------------
+# _matches_criteria: the shared FieldFilter evaluator extra_criteria checks
+# build on for post-write verification (e.g. the vector adapter, which
+# can't get a matched-count back from a filter-scoped write).
+# --------------------------------------------------------------------------
+
+
+async def test_matches_criteria_evaluates_every_operator(make_widget):
+    widget = make_widget(name="alpha", quantity=5)
+
+    assert _matches_criteria(widget, [FieldFilter(field="quantity", operator=Operator.EQ, value=5)])
+    assert not _matches_criteria(
+        widget, [FieldFilter(field="quantity", operator=Operator.EQ, value=6)]
+    )
+    assert _matches_criteria(widget, [FieldFilter(field="quantity", operator=Operator.NE, value=6)])
+    assert _matches_criteria(widget, [FieldFilter(field="quantity", operator=Operator.GT, value=4)])
+    assert not _matches_criteria(
+        widget, [FieldFilter(field="quantity", operator=Operator.GT, value=5)]
+    )
+    assert _matches_criteria(widget, [FieldFilter(field="quantity", operator=Operator.GTE, value=5)])
+    assert _matches_criteria(widget, [FieldFilter(field="quantity", operator=Operator.LT, value=6)])
+    assert _matches_criteria(widget, [FieldFilter(field="quantity", operator=Operator.LTE, value=5)])
+    assert _matches_criteria(
+        widget, [FieldFilter(field="quantity", operator=Operator.IN, value=[4, 5, 6])]
+    )
+    assert _matches_criteria(
+        widget, [FieldFilter(field="quantity", operator=Operator.NOT_IN, value=[1, 2, 3])]
+    )
+    assert _matches_criteria(
+        widget, [FieldFilter(field="name", operator=Operator.CONTAINS, value="lph")]
+    )
+    assert _matches_criteria(
+        widget, [FieldFilter(field="tenant_id", operator=Operator.IS_NULL, value=True)]
+    )
+    assert not _matches_criteria(
+        widget, [FieldFilter(field="name", operator=Operator.IS_NULL, value=True)]
+    )
+
+
+async def test_matches_criteria_ands_every_filter(make_widget):
+    widget = make_widget(name="alpha", quantity=5)
+
+    assert _matches_criteria(
+        widget,
+        [
+            FieldFilter(field="name", operator=Operator.EQ, value="alpha"),
+            FieldFilter(field="quantity", operator=Operator.EQ, value=5),
+        ],
+    )
+    assert not _matches_criteria(
+        widget,
+        [
+            FieldFilter(field="name", operator=Operator.EQ, value="alpha"),
+            FieldFilter(field="quantity", operator=Operator.EQ, value=99),
+        ],
+    )
+
+
+async def test_matches_criteria_with_no_criteria_is_vacuously_true(make_widget):
+    assert _matches_criteria(make_widget(), None) is True
+
+
+async def test_matches_criteria_raises_for_unsupported_operator(make_widget):
+    bogus = FieldFilter.model_construct(field="quantity", operator="bogus", value=1)
+
+    with pytest.raises(UnsupportedOperationError):
+        _matches_criteria(make_widget(), [bogus])

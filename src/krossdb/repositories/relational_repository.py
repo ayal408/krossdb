@@ -84,6 +84,24 @@ def _apply_criteria(
     return stmt
 
 
+_WhereableT = TypeVar("_WhereableT")
+
+
+def _apply_extra_criteria(
+    stmt: _WhereableT, table: Table, extra_criteria: Specification | None
+) -> _WhereableT:
+    """Like :func:`_apply_criteria` but for ``Update``/``Delete`` statements.
+
+    Those don't share a base class with ``Select`` in SQLAlchemy's typing, so
+    this takes a separate (structurally identical) type var; both just need
+    a ``.where(...)`` method that returns the same statement type.
+    """
+
+    for filt in extra_criteria or []:
+        stmt = stmt.where(_condition_for_filter(table, filt))  # type: ignore[attr-defined]
+    return stmt
+
+
 class SQLAlchemyRepository(AbstractRepository[TModel, TId]):
     """CRUD/bulk/query implementation shared by Postgres, MySQL, and SQLite.
 
@@ -126,19 +144,30 @@ class SQLAlchemyRepository(AbstractRepository[TModel, TId]):
                 await session.execute(stmt)
         return entity
 
-    async def update(self, id_: TId, changes: Mapping[str, Any]) -> TModel:
+    async def update(
+        self,
+        id_: TId,
+        changes: Mapping[str, Any],
+        *,
+        extra_criteria: Specification | None = None,
+    ) -> TModel:
         stmt = update(self.table).where(self.table.c[self.id_column] == id_).values(**dict(changes))
+        stmt = _apply_extra_criteria(stmt, self.table, extra_criteria)
         async with self.adapter.acquire(role=RoutingRole.MASTER) as session:
             with translate_exceptions(table=self.table.name, op="update"):
                 result = cast("CursorResult[Any]", await session.execute(stmt))
         if result.rowcount == 0:
+            # Indistinguishable from "id doesn't exist" by design: a row that
+            # exists but fails extra_criteria (e.g. belongs to another tenant)
+            # must not leak its existence through a different error branch.
             raise RecordNotFoundError(self.model.__name__, id_)
         updated = await self.get_by_id(id_)
         assert updated is not None  # we just confirmed the row exists via rowcount
         return updated
 
-    async def delete(self, id_: TId) -> bool:
+    async def delete(self, id_: TId, *, extra_criteria: Specification | None = None) -> bool:
         stmt = delete(self.table).where(self.table.c[self.id_column] == id_)
+        stmt = _apply_extra_criteria(stmt, self.table, extra_criteria)
         async with self.adapter.acquire(role=RoutingRole.MASTER) as session:
             with translate_exceptions(table=self.table.name, op="delete"):
                 result = cast("CursorResult[Any]", await session.execute(stmt))
@@ -196,20 +225,28 @@ class SQLAlchemyRepository(AbstractRepository[TModel, TId]):
                     failed[index] = str(exc)
         return BulkResult(succeeded=succeeded, failed=failed)
 
-    async def bulk_update(self, updates: Mapping[TId, Mapping[str, Any]]) -> BulkResult[TModel]:
+    async def bulk_update(
+        self,
+        updates: Mapping[TId, Mapping[str, Any]],
+        *,
+        extra_criteria: Specification | None = None,
+    ) -> BulkResult[TModel]:
         succeeded: list[TModel] = []
         failed: dict[int, str] = {}
         for index, (id_, changes) in enumerate(updates.items()):
             try:
-                succeeded.append(await self.update(id_, changes))
+                succeeded.append(await self.update(id_, changes, extra_criteria=extra_criteria))
             except KrossDBError as exc:
                 failed[index] = str(exc)
         return BulkResult(succeeded=succeeded, failed=failed)
 
-    async def bulk_delete(self, ids: Sequence[TId]) -> int:
+    async def bulk_delete(
+        self, ids: Sequence[TId], *, extra_criteria: Specification | None = None
+    ) -> int:
         if not ids:
             return 0
         stmt = delete(self.table).where(self.table.c[self.id_column].in_(ids))
+        stmt = _apply_extra_criteria(stmt, self.table, extra_criteria)
         async with self.adapter.acquire(role=RoutingRole.MASTER) as session:
             with translate_exceptions(table=self.table.name, op="bulk_delete"):
                 result = cast("CursorResult[Any]", await session.execute(stmt))

@@ -84,6 +84,49 @@ def _normalize_criteria(criteria: Mapping[str, Any] | Specification | None) -> l
     return list(criteria)
 
 
+def _matches_field_filter(entity: Any, filt: FieldFilter) -> bool:
+    """Evaluate one :class:`FieldFilter` against an already-fetched entity in Python.
+
+    Used where a backend already fetched the row/point/document by id and a
+    caller (currently :class:`~krossdb.multitenancy.context.TenantScopedRepository`
+    via the vector adapter) needs to confirm client-side whether it also
+    satisfies additional criteria, rather than re-querying the backend.
+    """
+
+    actual = getattr(entity, filt.field, None)
+    operator = filt.operator
+    value = filt.value
+    if operator is Operator.EQ:
+        return bool(actual == value)
+    if operator is Operator.NE:
+        return bool(actual != value)
+    if operator is Operator.GT:
+        return actual is not None and actual > value
+    if operator is Operator.GTE:
+        return actual is not None and actual >= value
+    if operator is Operator.LT:
+        return actual is not None and actual < value
+    if operator is Operator.LTE:
+        return actual is not None and actual <= value
+    if operator is Operator.IN:
+        return actual in value
+    if operator is Operator.NOT_IN:
+        return actual not in value
+    if operator is Operator.CONTAINS:
+        return actual is not None and str(value) in str(actual)
+    if operator is Operator.IS_NULL:
+        return (actual is None) is bool(value)
+    from krossdb.core.exceptions import UnsupportedOperationError
+
+    raise UnsupportedOperationError(f"Operator {operator!r} is not supported by _matches_criteria")
+
+
+def _matches_criteria(entity: Any, criteria: Mapping[str, Any] | Specification | None) -> bool:
+    """True if ``entity`` satisfies every filter in ``criteria`` (an implicit AND)."""
+
+    return all(_matches_field_filter(entity, filt) for filt in _normalize_criteria(criteria))
+
+
 class Page(BaseModel, Generic[TModel]):
     """A page of results plus enough metadata to fetch the next one."""
 
@@ -146,12 +189,30 @@ class AbstractRepository(ABC, Generic[TModel, TId]):
         """Persist a new entity, returning it with any backend-assigned fields populated."""
 
     @abstractmethod
-    async def update(self, id_: TId, changes: Mapping[str, Any]) -> TModel:
-        """Apply a partial update and return the resulting entity."""
+    async def update(
+        self,
+        id_: TId,
+        changes: Mapping[str, Any],
+        *,
+        extra_criteria: Specification | None = None,
+    ) -> TModel:
+        """Apply a partial update and return the resulting entity.
+
+        ``extra_criteria`` is ANDed with the id match *at the query level*
+        (not as a separate check-then-act read), so a row that doesn't
+        satisfy it is treated exactly like a missing row: the update is a
+        no-op and ``RecordNotFoundError`` is raised. This is what lets
+        :class:`~krossdb.multitenancy.context.TenantScopedRepository` scope
+        writes to the active tenant atomically instead of racing a prior
+        ownership read against this call.
+        """
 
     @abstractmethod
-    async def delete(self, id_: TId) -> bool:
-        """Delete by id; returns ``True`` if a record was actually removed."""
+    async def delete(self, id_: TId, *, extra_criteria: Specification | None = None) -> bool:
+        """Delete by id; returns ``True`` if a record was actually removed.
+
+        See :meth:`update` for what ``extra_criteria`` does and why.
+        """
 
     # -- querying -------------------------------------------------------------
 
@@ -180,11 +241,19 @@ class AbstractRepository(ABC, Generic[TModel, TId]):
     ) -> BulkResult[TModel]: ...
 
     @abstractmethod
-    async def bulk_update(self, updates: Mapping[TId, Mapping[str, Any]]) -> BulkResult[TModel]: ...
+    async def bulk_update(
+        self,
+        updates: Mapping[TId, Mapping[str, Any]],
+        *,
+        extra_criteria: Specification | None = None,
+    ) -> BulkResult[TModel]:
+        """Apply each update; an id not satisfying ``extra_criteria`` is a per-item failure."""
 
     @abstractmethod
-    async def bulk_delete(self, ids: Sequence[TId]) -> int:
-        """Returns the number of records actually deleted."""
+    async def bulk_delete(
+        self, ids: Sequence[TId], *, extra_criteria: Specification | None = None
+    ) -> int:
+        """Returns the number of records actually deleted (only those matching ``extra_criteria``)."""
 
 
 __all__ = [

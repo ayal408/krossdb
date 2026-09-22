@@ -181,6 +181,10 @@ async def test_bulk_delete_skips_ids_owned_by_other_tenants(scoped_repository, m
 async def test_bulk_update_applies_changes_only_to_records_owned_by_the_active_tenant(
     scoped_repository, make_widget
 ):
+    """A foreign-tenant id in the batch is now a reported per-item failure
+    (RecordNotFoundError, same as a plain missing id), not a silent drop:
+    the tenant filter is enforced by the inner repository's own query via
+    ``extra_criteria``, not a separate pre-check the wrapper does itself."""
     with tenant_scope("tenant-a"):
         owned = await scoped_repository.create(make_widget(name="mine"))
     with tenant_scope("tenant-b"):
@@ -191,9 +195,10 @@ async def test_bulk_update_applies_changes_only_to_records_owned_by_the_active_t
             {owned.id: {"name": "renamed"}, foreign.id: {"name": "hijacked"}}
         )
 
-    assert result.all_succeeded
+    assert not result.all_succeeded
     assert [w.id for w in result.succeeded] == [owned.id]
     assert result.succeeded[0].name == "renamed"
+    assert len(result.failed) == 1
 
     with tenant_scope("tenant-b"):
         untouched = await scoped_repository.get_by_id(foreign.id)
@@ -210,7 +215,7 @@ async def test_bulk_update_with_no_owned_ids_updates_nothing(scoped_repository, 
         result = await scoped_repository.bulk_update({foreign.id: {"name": "hijacked"}})
 
     assert result.succeeded == []
-    assert result.failed == {}
+    assert len(result.failed) == 1
 
 
 async def test_bulk_update_rejects_an_attempt_to_reassign_tenant_id(scoped_repository, make_widget):

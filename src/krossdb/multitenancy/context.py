@@ -9,6 +9,13 @@ accidentally leak another tenant's data through a forgotten filter.
 
 Requires the wrapped model to declare a ``tenant_id: str | None`` field (as
 :class:`krossdb.models.base.Entity` does).
+
+Every write (``update``/``delete``/``bulk_update``/``bulk_delete``) passes
+the tenant filter to the inner repository as ``extra_criteria`` rather than
+checking ownership with a separate prior read: the inner repository ANDs it
+into the mutation's own query (``WHERE id = ? AND tenant_id = ?`` and
+backend equivalents), so a record belonging to another tenant is never
+touched, atomically, instead of relying on a check-then-act race.
 """
 
 from __future__ import annotations
@@ -59,13 +66,14 @@ class TenantScopedRepository(AbstractRepository[TModel, TId]):
         self._inner = inner
         self.model = inner.model
 
+    def _tenant_filter(self) -> FieldFilter:
+        return FieldFilter(field="tenant_id", operator=Operator.EQ, value=get_tenant_id(required=True))
+
     def _scoped_criteria(
         self, criteria: Mapping[str, Any] | Specification | None
     ) -> list[FieldFilter]:
         scoped = _normalize_criteria(criteria)
-        scoped.append(
-            FieldFilter(field="tenant_id", operator=Operator.EQ, value=get_tenant_id(required=True))
-        )
+        scoped.append(self._tenant_filter())
         return scoped
 
     def _owned(self, entity: TModel | None) -> TModel | None:
@@ -96,15 +104,19 @@ class TenantScopedRepository(AbstractRepository[TModel, TId]):
         stamped = entity.model_copy(update={"tenant_id": tenant_id})
         return await self._inner.create(stamped, idempotency_key=idempotency_key)
 
-    async def update(self, id_: TId, changes: Mapping[str, Any]) -> TModel:
-        await self.get_by_id_or_raise(id_)  # raises RecordNotFoundError if not owned by this tenant
-        _reject_tenant_id_reassignment(changes, get_tenant_id(required=True))
-        return await self._inner.update(id_, changes)
+    async def update(
+        self, id_: TId, changes: Mapping[str, Any], *, extra_criteria: Specification | None = None
+    ) -> TModel:
+        tenant_id = get_tenant_id(required=True)
+        _reject_tenant_id_reassignment(changes, tenant_id)
+        return await self._inner.update(
+            id_, changes, extra_criteria=[self._tenant_filter(), *(extra_criteria or [])]
+        )
 
-    async def delete(self, id_: TId) -> bool:
-        if await self.get_by_id(id_) is None:
-            return False
-        return await self._inner.delete(id_)
+    async def delete(self, id_: TId, *, extra_criteria: Specification | None = None) -> bool:
+        return await self._inner.delete(
+            id_, extra_criteria=[self._tenant_filter(), *(extra_criteria or [])]
+        )
 
     async def find(
         self,
@@ -135,20 +147,25 @@ class TenantScopedRepository(AbstractRepository[TModel, TId]):
         stamped = [e.model_copy(update={"tenant_id": tenant_id}) for e in entities]
         return await self._inner.bulk_create(stamped, idempotency_key=idempotency_key)
 
-    async def bulk_update(self, updates: Mapping[TId, Mapping[str, Any]]) -> BulkResult[TModel]:
+    async def bulk_update(
+        self,
+        updates: Mapping[TId, Mapping[str, Any]],
+        *,
+        extra_criteria: Specification | None = None,
+    ) -> BulkResult[TModel]:
         tenant_id = get_tenant_id(required=True)
         for changes in updates.values():
             _reject_tenant_id_reassignment(changes, tenant_id)
+        return await self._inner.bulk_update(
+            updates, extra_criteria=[self._tenant_filter(), *(extra_criteria or [])]
+        )
 
-        owned: dict[TId, Mapping[str, Any]] = {}
-        for id_, changes in updates.items():
-            if await self.get_by_id(id_) is not None:
-                owned[id_] = changes
-        return await self._inner.bulk_update(owned)
-
-    async def bulk_delete(self, ids: Sequence[TId]) -> int:
-        owned_ids = [id_ for id_ in ids if await self.get_by_id(id_) is not None]
-        return await self._inner.bulk_delete(owned_ids)
+    async def bulk_delete(
+        self, ids: Sequence[TId], *, extra_criteria: Specification | None = None
+    ) -> int:
+        return await self._inner.bulk_delete(
+            ids, extra_criteria=[self._tenant_filter(), *(extra_criteria or [])]
+        )
 
 
 __all__ = ["TenantScopedRepository"]
