@@ -32,6 +32,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   that the built-in `TimeoutError`/`ConnectionError` mapping isn't shadowed
   once driver mappers are registered. Raises `exception_mapper.py` coverage
   from 67% to 100%.
+- Added the missing success-path and bulk-update coverage for
+  `TenantScopedRepository` (`krossdb.multitenancy.context`): an owned
+  record's `update`/`delete` succeeding, `count()` being scoped to the
+  active tenant, and `bulk_update()` applying changes only to ids owned by
+  the active tenant while silently dropping the rest (mirroring
+  `bulk_delete`'s existing cross-tenant behavior). Raises
+  `multitenancy/context.py` coverage from 80% to 100%.
 
 ### Added
 
