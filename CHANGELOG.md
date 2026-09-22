@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Security
+
+- **Fixed a tenant-isolation bypass in `TenantScopedRepository`**: `update()`
+  and `bulk_update()` forwarded the caller-supplied `changes` mapping to the
+  inner repository verbatim, so a tenant could reassign one of its own
+  records to a different `tenant_id` (or detach it from tenancy entirely) by
+  including `tenant_id` in `changes` — despite every read path being
+  tenant-scoped. Both methods now raise `CrossTenantAccessError` if
+  `changes` attempts to set `tenant_id` to anything other than the active
+  tenant. `bulk_create()` also now rejects (rather than silently
+  overwriting) any entity pre-stamped with a different tenant's id, matching
+  `create()`'s existing behavior.
+
 ### Changed
 
 - Bumped minimum versions of all runtime and dev dependencies to their
@@ -37,8 +50,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   record's `update`/`delete` succeeding, `count()` being scoped to the
   active tenant, and `bulk_update()` applying changes only to ids owned by
   the active tenant while silently dropping the rest (mirroring
-  `bulk_delete`'s existing cross-tenant behavior). Raises
-  `multitenancy/context.py` coverage from 80% to 100%.
+  `bulk_delete`'s existing cross-tenant behavior). Also adds regression
+  tests for the tenant-id-reassignment fix above (single and bulk update,
+  including the no-op case where `changes` redundantly repeats the current
+  tenant id), the `bulk_create` foreign-pre-stamp rejection, every
+  operation's `TenantContextMissingError` with no active `tenant_scope`,
+  and a concurrency test proving two tenants running through the same
+  repository instance via `asyncio.gather` never see each other's data.
+  Raises `multitenancy/context.py` coverage from 80% to 100%.
 
 ### Added
 
