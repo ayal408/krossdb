@@ -18,6 +18,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   triggers under newer pytest, without disabling unraisable-exception
   detection for the rest of the suite.
 
+### Tests
+
+- Added direct unit coverage for every driver-specific mapper in
+  `krossdb.core.exception_mapper` (SQLAlchemy, pymongo, qdrant-client, and
+  asyncpg where the `postgres` extra is installed), plus the `ImportError`
+  fallback each `_register_*_mapper()` takes when its driver isn't
+  installed. Each case asserts the mapped exception type, that the message
+  carries the driver's original text, and that `.cause` (and, via
+  `translate_exceptions`, Python's own `__cause__` chain) points back at the
+  raw driver exception. Also covers that `bootstrap_default_mappers()` is
+  idempotent (no duplicate/reordered registrations on a second call) and
+  that the built-in `TimeoutError`/`ConnectionError` mapping isn't shadowed
+  once driver mappers are registered. Raises `exception_mapper.py` coverage
+  from 67% to 100%.
+
 ### Added
 
 - `krossdb.schema`: declarative table definitions in YAML/JSON (tables, columns,
