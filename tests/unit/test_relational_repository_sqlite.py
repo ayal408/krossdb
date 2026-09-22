@@ -145,6 +145,102 @@ async def test_bulk_delete_returns_count_removed(widget_sql_repo: SQLAlchemyRepo
     assert deleted == 3
 
 
+# --------------------------------------------------------------------------
+# extra_criteria: proves the tenant-scoping fix is atomic at the real-SQL
+# level (a single `WHERE id = ? AND tenant_id = ?`), not a separate read
+# followed by an unscoped write. See krossdb.multitenancy.context and
+# issue #35 (TenantScopedRepository.update()/delete() TOCTOU).
+# --------------------------------------------------------------------------
+
+
+async def test_update_with_matching_extra_criteria_succeeds(
+    widget_sql_repo: SQLAlchemyRepository,
+) -> None:
+    widget = Widget(name="scoped-owned", quantity=1, tenant_id="tenant-a")
+    await widget_sql_repo.create(widget)
+
+    updated = await widget_sql_repo.update(
+        widget.id,
+        {"quantity": 99},
+        extra_criteria=[FieldFilter(field="tenant_id", operator=Operator.EQ, value="tenant-a")],
+    )
+
+    assert updated.quantity == 99
+
+
+async def test_update_with_non_matching_extra_criteria_raises_record_not_found(
+    widget_sql_repo: SQLAlchemyRepository,
+) -> None:
+    """A real UPDATE ... WHERE id = ? AND tenant_id = ? against SQLite:
+    the row exists (under a different tenant) but the query's own WHERE
+    clause excludes it, so rowcount is 0 — proving the scoping happens in
+    the query itself, not in a separate check before it."""
+    widget = Widget(name="scoped-foreign", quantity=1, tenant_id="tenant-a")
+    await widget_sql_repo.create(widget)
+
+    with pytest.raises(RecordNotFoundError):
+        await widget_sql_repo.update(
+            widget.id,
+            {"quantity": 99},
+            extra_criteria=[FieldFilter(field="tenant_id", operator=Operator.EQ, value="tenant-b")],
+        )
+
+    # the row must be completely untouched
+    untouched = await widget_sql_repo.get_by_id(widget.id)
+    assert untouched.quantity == 1
+    assert untouched.tenant_id == "tenant-a"
+
+
+async def test_delete_with_non_matching_extra_criteria_leaves_row_intact(
+    widget_sql_repo: SQLAlchemyRepository,
+) -> None:
+    widget = Widget(name="scoped-delete", quantity=1, tenant_id="tenant-a")
+    await widget_sql_repo.create(widget)
+
+    deleted = await widget_sql_repo.delete(
+        widget.id,
+        extra_criteria=[FieldFilter(field="tenant_id", operator=Operator.EQ, value="tenant-b")],
+    )
+
+    assert deleted is False
+    assert await widget_sql_repo.get_by_id(widget.id) is not None
+
+
+async def test_bulk_update_with_extra_criteria_reports_non_matching_ids_as_failures(
+    widget_sql_repo: SQLAlchemyRepository,
+) -> None:
+    owned = Widget(name="bulk-scoped-owned", quantity=1, tenant_id="tenant-a")
+    foreign = Widget(name="bulk-scoped-foreign", quantity=1, tenant_id="tenant-b")
+    await widget_sql_repo.bulk_create([owned, foreign])
+
+    result = await widget_sql_repo.bulk_update(
+        {owned.id: {"quantity": 2}, foreign.id: {"quantity": 2}},
+        extra_criteria=[FieldFilter(field="tenant_id", operator=Operator.EQ, value="tenant-a")],
+    )
+
+    assert [w.id for w in result.succeeded] == [owned.id]
+    assert len(result.failed) == 1
+    untouched = await widget_sql_repo.get_by_id(foreign.id)
+    assert untouched.quantity == 1
+
+
+async def test_bulk_delete_with_extra_criteria_only_removes_matching_rows(
+    widget_sql_repo: SQLAlchemyRepository,
+) -> None:
+    owned = Widget(name="bulk-del-owned", quantity=1, tenant_id="tenant-a")
+    foreign = Widget(name="bulk-del-foreign", quantity=1, tenant_id="tenant-b")
+    await widget_sql_repo.bulk_create([owned, foreign])
+
+    deleted = await widget_sql_repo.bulk_delete(
+        [owned.id, foreign.id],
+        extra_criteria=[FieldFilter(field="tenant_id", operator=Operator.EQ, value="tenant-a")],
+    )
+
+    assert deleted == 1
+    assert await widget_sql_repo.get_by_id(owned.id) is None
+    assert await widget_sql_repo.get_by_id(foreign.id) is not None
+
+
 async def test_find_with_criteria_and_pagination(widget_sql_repo: SQLAlchemyRepository) -> None:
     for i in range(5):
         await widget_sql_repo.create(Widget(name=f"page-{i}", quantity=1))

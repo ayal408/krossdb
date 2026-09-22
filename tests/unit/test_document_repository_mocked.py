@@ -123,6 +123,39 @@ async def test_update_missing_document_raises_record_not_found(repo, mock_collec
         await repo.update("missing-id", {"name": "x"})
 
 
+async def test_update_with_extra_criteria_ands_it_into_the_filter_query(
+    repo, mock_collection, make_widget
+):
+    """extra_criteria is combined with the id filter into one query.filter
+    Motor sees, not a separate check before update_one — this is what makes
+    TenantScopedRepository's writes atomic at the driver level (issue #35)."""
+    existing = make_widget(name="before")
+    mock_collection.find_one.return_value = existing.model_dump(mode="json")
+
+    await repo.update(
+        existing.id,
+        {"name": "after"},
+        extra_criteria=[FieldFilter(field="tenant_id", operator=Operator.EQ, value="tenant-a")],
+    )
+
+    mock_collection.update_one.assert_awaited_once_with(
+        {"id": str(existing.id), "tenant_id": "tenant-a"}, {"$set": {"name": "after"}}
+    )
+
+
+async def test_update_with_extra_criteria_excluding_the_row_raises_record_not_found(
+    repo, mock_collection
+):
+    mock_collection.update_one.return_value = SimpleNamespace(matched_count=0)
+
+    with pytest.raises(RecordNotFoundError):
+        await repo.update(
+            "some-id",
+            {"name": "x"},
+            extra_criteria=[FieldFilter(field="tenant_id", operator=Operator.EQ, value="tenant-a")],
+        )
+
+
 async def test_delete_returns_true_when_a_document_was_removed(repo, mock_collection):
     mock_collection.delete_one.return_value = SimpleNamespace(deleted_count=1)
 
@@ -133,6 +166,17 @@ async def test_delete_returns_false_when_nothing_matched(repo, mock_collection):
     mock_collection.delete_one.return_value = SimpleNamespace(deleted_count=0)
 
     assert await repo.delete("some-id") is False
+
+
+async def test_delete_with_extra_criteria_ands_it_into_the_filter_query(repo, mock_collection):
+    await repo.delete(
+        "some-id",
+        extra_criteria=[FieldFilter(field="tenant_id", operator=Operator.EQ, value="tenant-a")],
+    )
+
+    mock_collection.delete_one.assert_awaited_once_with(
+        {"id": "some-id", "tenant_id": "tenant-a"}
+    )
 
 
 async def test_find_returns_page_with_total_from_count_documents(
@@ -270,3 +314,20 @@ async def test_bulk_delete_with_empty_ids_short_circuits(repo, mock_collection):
 
     mock_collection.delete_many.assert_not_awaited()
     assert deleted == 0
+
+
+async def test_bulk_delete_with_extra_criteria_ands_it_into_the_filter_query(
+    repo, mock_collection, make_widget
+):
+    ids = [make_widget().id for _ in range(2)]
+    mock_collection.delete_many.return_value = SimpleNamespace(deleted_count=1)
+
+    deleted = await repo.bulk_delete(
+        ids,
+        extra_criteria=[FieldFilter(field="tenant_id", operator=Operator.EQ, value="tenant-a")],
+    )
+
+    mock_collection.delete_many.assert_awaited_once_with(
+        {"id": {"$in": [str(i) for i in ids]}, "tenant_id": "tenant-a"}
+    )
+    assert deleted == 1

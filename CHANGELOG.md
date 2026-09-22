@@ -19,6 +19,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   tenant. `bulk_create()` also now rejects (rather than silently
   overwriting) any entity pre-stamped with a different tenant's id, matching
   `create()`'s existing behavior.
+- **Closed the remaining TOCTOU gap in `TenantScopedRepository.update()`/
+  `delete()`/`bulk_update()`/`bulk_delete()`** (issue #35): these previously
+  checked ownership with a separate read (`get_by_id`) before issuing the
+  actual write, which — for every backend adapter — only filtered the write
+  itself by `id`, never by `tenant_id`. `AbstractRepository.update()`,
+  `delete()`, `bulk_update()`, and `bulk_delete()` now accept an
+  `extra_criteria` keyword argument that each adapter ANDs into the mutation's
+  own query at the driver level instead of a prior check: SQL gets
+  `WHERE id = ? AND tenant_id = ?`; MongoDB gets `{id: ..., tenant_id: ...}`
+  in the same filter document; Qdrant gets a `Filter` combining
+  `HasIdCondition` with the extra field conditions as the mutation's own
+  points selector. `TenantScopedRepository` now passes the active tenant as
+  `extra_criteria` on every write instead of pre-checking ownership itself,
+  so a record belonging to another tenant is provably never touched by a
+  concurrent write, rather than merely rejected by an earlier read that could
+  go stale before the write runs.
+  As a side effect, `bulk_update()`/`bulk_delete()` no longer silently drop
+  ids the caller doesn't own — they now surface as per-item `RecordNotFoundError`
+  entries in `BulkResult.failed`, giving visibility into rejected cross-tenant
+  attempts instead of a silent no-op.
 
 ### Changed
 

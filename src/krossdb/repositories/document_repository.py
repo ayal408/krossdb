@@ -119,22 +119,40 @@ class MongoDBRepository(AbstractRepository[TModel, TId]):
                 await db[self.collection_name].insert_one(self._entity_to_doc(entity))
         return entity
 
-    async def update(self, id_: TId, changes: Mapping[str, Any]) -> TModel:
+    def _id_and_extra_query(
+        self, id_: TId, extra_criteria: Specification | None
+    ) -> dict[str, Any]:
+        return _criteria_to_query(
+            [
+                FieldFilter(field=self.id_field, operator=Operator.EQ, value=str(id_)),
+                *(extra_criteria or []),
+            ]
+        )
+
+    async def update(
+        self,
+        id_: TId,
+        changes: Mapping[str, Any],
+        *,
+        extra_criteria: Specification | None = None,
+    ) -> TModel:
+        query = self._id_and_extra_query(id_, extra_criteria)
         async with self.adapter.acquire() as db:
             with translate_exceptions(collection=self.collection_name, op="update"):
-                result = await db[self.collection_name].update_one(
-                    {self.id_field: str(id_)}, {"$set": dict(changes)}
-                )
+                result = await db[self.collection_name].update_one(query, {"$set": dict(changes)})
         if result.matched_count == 0:
+            # Indistinguishable from "id doesn't exist": a document that
+            # exists but fails extra_criteria must not leak its existence.
             raise RecordNotFoundError(self.model.__name__, id_)
         updated = await self.get_by_id(id_)
         assert updated is not None  # matched_count > 0 guarantees the document exists
         return updated
 
-    async def delete(self, id_: TId) -> bool:
+    async def delete(self, id_: TId, *, extra_criteria: Specification | None = None) -> bool:
+        query = self._id_and_extra_query(id_, extra_criteria)
         async with self.adapter.acquire() as db:
             with translate_exceptions(collection=self.collection_name, op="delete"):
-                result = await db[self.collection_name].delete_one({self.id_field: str(id_)})
+                result = await db[self.collection_name].delete_one(query)
         return result.deleted_count > 0
 
     async def find(
@@ -182,24 +200,35 @@ class MongoDBRepository(AbstractRepository[TModel, TId]):
                     failed[index] = str(exc)
         return BulkResult(succeeded=succeeded, failed=failed)
 
-    async def bulk_update(self, updates: Mapping[TId, Mapping[str, Any]]) -> BulkResult[TModel]:
+    async def bulk_update(
+        self,
+        updates: Mapping[TId, Mapping[str, Any]],
+        *,
+        extra_criteria: Specification | None = None,
+    ) -> BulkResult[TModel]:
         succeeded: list[TModel] = []
         failed: dict[int, str] = {}
         for index, (id_, changes) in enumerate(updates.items()):
             try:
-                succeeded.append(await self.update(id_, changes))
+                succeeded.append(await self.update(id_, changes, extra_criteria=extra_criteria))
             except KrossDBError as exc:
                 failed[index] = str(exc)
         return BulkResult(succeeded=succeeded, failed=failed)
 
-    async def bulk_delete(self, ids: Sequence[TId]) -> int:
+    async def bulk_delete(
+        self, ids: Sequence[TId], *, extra_criteria: Specification | None = None
+    ) -> int:
         if not ids:
             return 0
+        query = _criteria_to_query(
+            [
+                FieldFilter(field=self.id_field, operator=Operator.IN, value=[str(i) for i in ids]),
+                *(extra_criteria or []),
+            ]
+        )
         async with self.adapter.acquire() as db:
             with translate_exceptions(collection=self.collection_name, op="bulk_delete"):
-                result = await db[self.collection_name].delete_many(
-                    {self.id_field: {"$in": [str(i) for i in ids]}}
-                )
+                result = await db[self.collection_name].delete_many(query)
         return result.deleted_count
 
 
