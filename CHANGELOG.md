@@ -12,9 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 - Bumped minimum versions of all runtime and dev dependencies to their
   current releases (pydantic, SQLAlchemy, structlog, OpenTelemetry, tenacity,
   rich, anyio, the database drivers, and the pytest/mypy/ruff/pre-commit
-  toolchain). Added an `ignore::ResourceWarning:pymongo.*` filter and
-  `-p no:unraisableexception` to `addopts` to suppress a benign unclosed-socket
-  warning that pymongo's lazy `pymongo.auth` import triggers under newer pytest.
+  toolchain). Added `ignore::ResourceWarning:pymongo.*` and a targeted
+  `pytest.PytestUnraisableExceptionWarning` filter to suppress a benign
+  unclosed-socket warning that pymongo's lazy `pymongo.auth` import
+  triggers under newer pytest, without disabling unraisable-exception
+  detection for the rest of the suite.
 
 ### Added
 
