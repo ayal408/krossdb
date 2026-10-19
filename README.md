@@ -144,6 +144,24 @@ Alembic's own CLI (`alembic revision --autogenerate`, `alembic upgrade head`,
 ...). See `krossdb schema init-migrations --help` and
 `krossdb.migrations.configure` for details.
 
+## Versioned schema migrations
+
+The optional migration layer compares a declarative schema with an existing
+database, previews additive changes and runs project-owned numbered revisions:
+
+```bash
+pip install "krossdb[migrations,sqlite]"
+krossdb schema plan --connection primary --schema schema.yaml
+krossdb schema migrate --connection primary --manifest migrations.yaml --dry-run
+krossdb schema migrate --connection primary --manifest migrations.yaml
+```
+
+PostgreSQL and SQLite apply pending changes and checksum-verified history in
+one locked transaction. Renames, type changes and removals require explicit
+migrations. MySQL continues to use Alembic because its DDL implicitly commits.
+See [the migration guide](docs/schema-migrations.md) for guarantees, dialect
+boundaries and async usage, and [a generic manifest](examples/migrations.yaml).
+
 ## Testing
 
 ```bash

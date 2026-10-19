@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+
+- Generic additive schema planning and project-owned numbered JSON/YAML
+  migrations, with read-only CLI previews, immutable revision checksums,
+  serialized PostgreSQL/SQLite application and atomic DDL/history rollback.
+  Existing-definition changes require explicit revisions. MySQL continues
+  to use Alembic because it does not support transactional DDL.
+- Named composite UNIQUE constraints in declarative schemas; duplicate names
+  and missing referenced columns are validated before generating metadata.
+
 ### Security
 
 - **Fixed a tenant-isolation bypass in `TenantScopedRepository`**: `update()`
