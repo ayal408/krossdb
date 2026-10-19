@@ -16,6 +16,8 @@ krossdb schema plan --connection primary --schema schema.yaml --config krossdb.y
 
 This inspects the **master** database and prints JSON describing each change
 and whether it can be applied automatically. It never writes DDL or history.
+Unknown schema fields are rejected, so a misspelled constraint/default cannot
+be silently omitted from an applied revision.
 Exit status is 0 for an additive/no-op plan, 2 when explicit changes are
 required, and 1 on an error. The plan reflects the database at inspection
 time; application always replans under the migration lock.

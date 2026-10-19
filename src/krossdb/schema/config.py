@@ -35,7 +35,7 @@ class ColumnType(StrEnum):
 class ColumnSpec(BaseModel):
     """One column: name, portable type, and the constraints DDL needs to know about."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     name: str
     type: ColumnType
@@ -55,7 +55,7 @@ class ColumnSpec(BaseModel):
 class ForeignKeySpec(BaseModel):
     """A composite-capable foreign key from this table's columns to another table's."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     columns: list[str] = Field(min_length=1)
     ref_table: str
@@ -75,7 +75,7 @@ class ForeignKeySpec(BaseModel):
 class IndexSpec(BaseModel):
     """A (possibly unique) index over one or more columns of the enclosing table."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     name: str | None = Field(default=None, description="Defaults to 'ix_<table>_<columns>'")
     columns: list[str] = Field(min_length=1)
@@ -94,7 +94,7 @@ class UniqueSpec(BaseModel):
 class TableSpec(BaseModel):
     """One table: its columns plus the foreign keys and indexes defined on it."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     name: str
     columns: list[ColumnSpec] = Field(min_length=1)
@@ -124,7 +124,7 @@ class TableSpec(BaseModel):
 class SchemaConfig(BaseModel):
     """The full declarative schema: every table, in dependency-safe creation order."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     tables: list[TableSpec] = Field(min_length=1)
 

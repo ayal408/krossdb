@@ -248,3 +248,24 @@ def test_cli_blocked_plan_exit_code_and_manifest_error(tmp_path):
     error = cli.invoke(app, ["migrate", "--connection", "primary", "--config", str(config), "--manifest", str(tmp_path / "absent.yaml")])
     assert error.exit_code == 1
     assert "Invalid migration manifest" in error.output
+
+
+def test_unknown_schema_fields_are_rejected_instead_of_silently_ignored():
+    from pydantic import ValidationError
+
+    target = schema()
+    target["tables"][0]["columns"][1]["defalt"] = "misspelled"
+    with pytest.raises(ValidationError, match="defalt"):
+        revision(definition=target)
+    target = schema()
+    target["triggers"] = [{"name": "unsupported_declarative_trigger"}]
+    with pytest.raises(ValidationError, match="triggers"):
+        revision(definition=target)
+
+
+def test_checksums_ignore_key_order_but_detect_authored_changes():
+    first = MigrationSpec.model_validate({"version": 1, "name": "initial", "schema": schema()})
+    reordered = MigrationSpec.model_validate({"schema": schema(), "name": "initial", "version": 1})
+    assert first.checksum == reordered.checksum
+    changed = MigrationSpec.model_validate({"version": 1, "name": "renamed", "schema": schema()})
+    assert first.checksum != changed.checksum

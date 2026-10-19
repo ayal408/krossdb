@@ -69,7 +69,9 @@ class MigrationSpec(BaseModel):
 
     @property
     def checksum(self) -> str:
-        payload = json.dumps(self.model_dump(mode="json", by_alias=True), sort_keys=True, separators=(",", ":"))
+        # Hash authored fields, so future library fields with defaults do not
+        # invalidate the checksums of unchanged project revision files.
+        payload = json.dumps(self.model_dump(mode="json", by_alias=True, exclude_unset=True), sort_keys=True, separators=(",", ":"))
         return hashlib.sha256(payload.encode()).hexdigest()
 
 
@@ -159,8 +161,7 @@ class MigrationRunner:
         if dialect not in {"postgresql", "sqlite"}:
             raise UnsupportedOperationError("Atomic migrations support PostgreSQL and SQLite; use Alembic for other dialects")
         dbapi = connection.connection.dbapi_connection
-        if (connection.get_execution_options().get("isolation_level") == "AUTOCOMMIT"
-                or (dialect == "postgresql" and getattr(dbapi, "autocommit", False))):
+        if dialect == "postgresql" and getattr(dbapi, "autocommit", False):
             raise ConfigurationError("Migrations cannot use AUTOCOMMIT")
         if dialect == "postgresql" and connection.get_isolation_level() != "READ COMMITTED":
             raise ConfigurationError("Use READ COMMITTED so history is refreshed after acquiring the migration lock")
