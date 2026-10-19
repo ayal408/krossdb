@@ -9,9 +9,7 @@ An enterprise-grade, multi-database Python library that provides a unified
 interface and repository pattern over relational (PostgreSQL/MySQL/SQLite),
 document (MongoDB), and vector (Qdrant) databases.
 
-> Published on PyPI as [`krossdb`](https://pypi.org/project/krossdb/) — the
-> name `krossdb` was already taken by an unrelated package. The Python
-> package you `import` is unaffected and remains `krossdb`.
+The Python package you import is `krossdb`.
 
 ## Why
 
