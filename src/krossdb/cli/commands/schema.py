@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import importlib
+import json
+from dataclasses import asdict
 from pathlib import Path
 from typing import Any
 
@@ -139,3 +141,71 @@ def init_migrations(
         f"Scaffolded Alembic project in {directory / 'alembic'} (+ {ini_path})",
         fg=typer.colors.GREEN,
     )
+
+
+@app.command("plan")
+def plan(
+    connection: str = typer.Option(..., "--connection"),
+    schema_path: Path = typer.Option(..., "--schema"),
+    config: Path = typer.Option(Path("krossdb.yaml"), "--config", "-c"),
+) -> None:
+    """Read-only comparison of the current database and a declarative schema."""
+    from krossdb.core.exceptions import KrossDBError
+
+    try:
+        asyncio.run(_migration_command(config, connection, schema_path, manifest=False, dry_run=True))
+    except KrossDBError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED)
+        raise typer.Exit(code=1) from exc
+
+
+@app.command("migrate")
+def migrate(
+    connection: str = typer.Option(..., "--connection"),
+    manifest: Path = typer.Option(..., "--manifest", help="Project-owned numbered migration YAML/JSON"),
+    config: Path = typer.Option(Path("krossdb.yaml"), "--config", "-c"),
+    dry_run: bool = typer.Option(False, "--dry-run", help="List pending revisions without changing the database"),
+) -> None:
+    """Apply pending revisions atomically, with history checks and a database lock."""
+    from krossdb.core.exceptions import KrossDBError
+
+    try:
+        asyncio.run(_migration_command(config, connection, manifest, manifest=True, dry_run=dry_run))
+    except KrossDBError as exc:
+        typer.secho(str(exc), fg=typer.colors.RED)
+        raise typer.Exit(code=1) from exc
+
+
+async def _migration_command(
+    config: Path, connection_name: str, path: Path, *, manifest: bool, dry_run: bool,
+) -> None:
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    from krossdb.core.exception_mapper import translate_exceptions
+    from krossdb.migrations import MigrationRunner, load_migrations, plan_schema
+    from krossdb.migrations.support import _load_master_dsn
+    from krossdb.schema import build_metadata, load_schema_config
+
+    engine = create_async_engine(_load_master_dsn(config, connection_name))
+    blocked = False
+    try:
+        with translate_exceptions(op="schema_migration"):
+            if manifest:
+                migration_runner = MigrationRunner(load_migrations(path))
+                if dry_run:
+                    async with engine.connect() as conn:
+                        pending = await conn.run_sync(migration_runner.pending)
+                    typer.echo(json.dumps([m.model_dump(mode="json", by_alias=True) for m in pending], indent=2))
+                else:
+                    applied = await migration_runner.apply_async(engine)
+                    typer.echo(f"Applied revisions: {list(applied)}")
+            else:
+                metadata = build_metadata(load_schema_config(path))
+                async with engine.connect() as conn:
+                    schema_plan = await conn.run_sync(lambda c: plan_schema(c, metadata))
+                typer.echo(json.dumps([asdict(change) for change in schema_plan.changes], indent=2))
+                blocked = bool(schema_plan.blocked)
+    finally:
+        await engine.dispose()
+    if blocked:
+        raise typer.Exit(code=2)

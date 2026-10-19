@@ -16,6 +16,7 @@ from krossdb.schema.config import (
     IndexSpec,
     SchemaConfig,
     TableSpec,
+    UniqueSpec,
     load_schema_config,
 )
 
@@ -26,6 +27,7 @@ __all__ = [
     "IndexSpec",
     "SchemaConfig",
     "TableSpec",
+    "UniqueSpec",
     "build_metadata",
     "load_schema_config",
 ]

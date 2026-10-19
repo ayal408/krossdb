@@ -1,0 +1,19 @@
+# Generic example only. Each consuming project owns its manifest and tables.
+migrations:
+  - version: 1
+    name: create_widgets
+    schema:
+      tables:
+        - name: widgets
+          columns:
+            - {name: id, type: integer, primary_key: true}
+            - {name: name, type: string, required: true}
+  - version: 2
+    name: add_quantity
+    schema:
+      tables:
+        - name: widgets
+          columns:
+            - {name: id, type: integer, primary_key: true}
+            - {name: name, type: string, required: true}
+            - {name: quantity, type: integer, required: true, default: 0}

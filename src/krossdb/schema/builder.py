@@ -24,8 +24,11 @@ from sqlalchemy import (
     String,
     Table,
     Text,
+    UniqueConstraint,
     Uuid,
+    false,
     func,
+    true,
 )
 from sqlalchemy.types import TypeEngine
 
@@ -71,6 +74,8 @@ def _server_default(spec: ColumnSpec) -> Any:
         return None
     if spec.type is ColumnType.DATETIME and spec.default == "now":
         return func.now()
+    if isinstance(spec.default, bool):
+        return true() if spec.default else false()
     return str(spec.default)
 
 
@@ -102,7 +107,8 @@ def _build_table(spec: TableSpec, metadata: MetaData) -> Table:
         for idx in spec.indexes
     ]
 
-    return Table(spec.name, metadata, *columns, *constraints, *indexes)
+    uniques = [UniqueConstraint(*uq.columns, name=uq.name) for uq in spec.unique_constraints]
+    return Table(spec.name, metadata, *columns, *constraints, *indexes, *uniques)
 
 
 def build_metadata(schema: SchemaConfig, *, metadata: MetaData | None = None) -> MetaData:

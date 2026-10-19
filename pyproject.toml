@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "krossdb"
-version = "0.1.0"
+version = "0.2.0"
 description = "Enterprise-grade, multi-database unified interface & repository pattern library for Python"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -51,7 +51,7 @@ sqlite = ["aiosqlite>=0.21"]
 mongodb = ["motor>=3.7.1", "pymongo>=4.18"]
 vector = ["qdrant-client>=1.19"]
 cache = ["redis[hiredis]>=8.1.0"]
-migrations = ["alembic>=1.16"]
+migrations = ["alembic>=1.16", "sqlparse>=0.5.3"]
 otel-exporters = [
     "opentelemetry-exporter-otlp>=1.44.0",
     "opentelemetry-instrumentation-sqlalchemy>=0.65b0",

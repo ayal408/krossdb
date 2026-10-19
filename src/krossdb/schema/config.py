@@ -35,7 +35,7 @@ class ColumnType(StrEnum):
 class ColumnSpec(BaseModel):
     """One column: name, portable type, and the constraints DDL needs to know about."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     name: str
     type: ColumnType
@@ -55,7 +55,7 @@ class ColumnSpec(BaseModel):
 class ForeignKeySpec(BaseModel):
     """A composite-capable foreign key from this table's columns to another table's."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     columns: list[str] = Field(min_length=1)
     ref_table: str
@@ -75,33 +75,46 @@ class ForeignKeySpec(BaseModel):
 class IndexSpec(BaseModel):
     """A (possibly unique) index over one or more columns of the enclosing table."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     name: str | None = Field(default=None, description="Defaults to 'ix_<table>_<columns>'")
     columns: list[str] = Field(min_length=1)
     unique: bool = False
 
 
+class UniqueSpec(BaseModel):
+    """A named, composite-capable UNIQUE constraint."""
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    name: str
+    columns: list[str] = Field(min_length=1)
+
+
 class TableSpec(BaseModel):
     """One table: its columns plus the foreign keys and indexes defined on it."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     name: str
     columns: list[ColumnSpec] = Field(min_length=1)
     foreign_keys: list[ForeignKeySpec] = Field(default_factory=list)
     indexes: list[IndexSpec] = Field(default_factory=list)
+    unique_constraints: list[UniqueSpec] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _validate_references(self) -> TableSpec:
         column_names = {c.name for c in self.columns}
+        if len(column_names) != len(self.columns):
+            raise ValueError(f"table {self.name!r} has duplicate column names")
         if not any(c.primary_key for c in self.columns):
             raise ValueError(f"table {self.name!r} has no primary_key column")
         for fk in self.foreign_keys:
             missing = set(fk.columns) - column_names
             if missing:
                 raise ValueError(f"table {self.name!r}: foreign key references undefined column(s) {sorted(missing)}")
-        for idx in self.indexes:
+        references: list[IndexSpec | UniqueSpec] = [*self.indexes, *self.unique_constraints]
+        for idx in references:
             missing = set(idx.columns) - column_names
             if missing:
                 raise ValueError(f"table {self.name!r}: index references undefined column(s) {sorted(missing)}")
@@ -111,19 +124,25 @@ class TableSpec(BaseModel):
 class SchemaConfig(BaseModel):
     """The full declarative schema: every table, in dependency-safe creation order."""
 
-    model_config = ConfigDict(frozen=True)
+    model_config = ConfigDict(frozen=True, extra="forbid")
 
     tables: list[TableSpec] = Field(min_length=1)
 
     @model_validator(mode="after")
     def _validate_fk_targets_exist(self) -> SchemaConfig:
         table_names = {t.name for t in self.tables}
+        if len(table_names) != len(self.tables):
+            raise ValueError("duplicate table names")
+        by_name = {t.name: t for t in self.tables}
         for table in self.tables:
             for fk in table.foreign_keys:
                 if fk.ref_table not in table_names:
                     raise ValueError(
                         f"table {table.name!r}: foreign key references unknown table {fk.ref_table!r}"
                     )
+                target_columns = {c.name for c in by_name[fk.ref_table].columns}
+                if set(fk.ref_columns) - target_columns:
+                    raise ValueError(f"foreign key references undefined columns on {fk.ref_table!r}")
         return self
 
 
@@ -163,5 +182,6 @@ __all__ = [
     "IndexSpec",
     "SchemaConfig",
     "TableSpec",
+    "UniqueSpec",
     "load_schema_config",
 ]

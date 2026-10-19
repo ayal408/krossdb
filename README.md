@@ -9,9 +9,7 @@ An enterprise-grade, multi-database Python library that provides a unified
 interface and repository pattern over relational (PostgreSQL/MySQL/SQLite),
 document (MongoDB), and vector (Qdrant) databases.
 
-> Published on PyPI as [`krossdb`](https://pypi.org/project/krossdb/) — the
-> name `krossdb` was already taken by an unrelated package. The Python
-> package you `import` is unaffected and remains `krossdb`.
+The Python package you import is `krossdb`.
 
 ## Why
 
@@ -143,6 +141,24 @@ hardcoded `sqlalchemy.url`; day-to-day migration work still goes through
 Alembic's own CLI (`alembic revision --autogenerate`, `alembic upgrade head`,
 ...). See `krossdb schema init-migrations --help` and
 `krossdb.migrations.configure` for details.
+
+## Versioned schema migrations
+
+The optional migration layer compares a declarative schema with an existing
+database, previews additive changes and runs project-owned numbered revisions:
+
+```bash
+pip install "krossdb[migrations,sqlite]"
+krossdb schema plan --connection primary --schema schema.yaml
+krossdb schema migrate --connection primary --manifest migrations.yaml --dry-run
+krossdb schema migrate --connection primary --manifest migrations.yaml
+```
+
+PostgreSQL and SQLite apply pending changes and checksum-verified history in
+one locked transaction. Renames, type changes and removals require explicit
+migrations. MySQL continues to use Alembic because its DDL implicitly commits.
+See [the migration guide](docs/schema-migrations.md) for guarantees, dialect
+boundaries and async usage, and [a generic manifest](examples/migrations.yaml).
 
 ## Testing
 
