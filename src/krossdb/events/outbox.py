@@ -29,6 +29,8 @@ class InMemoryOutboxStore(AbstractOutboxStore):
             self._records[record.id] = record
 
     async def fetch_unpublished(self, *, limit: int = 100) -> list[OutboxRecord]:
+        if limit <= 0:
+            raise ValueError("limit must be positive")
         unpublished = [r for r in self._records.values() if r.published_at is None]
         return unpublished[:limit]
 
@@ -71,6 +73,8 @@ class SQLAlchemyOutboxStore(AbstractOutboxStore):
                 # committing here would prematurely commit business changes.
 
     async def fetch_unpublished(self, *, limit: int = 100) -> list[OutboxRecord]:
+        if limit <= 0:
+            raise ValueError("limit must be positive")
         stmt = (
             select(self.table)
             .where(self.table.c.published_at.is_(None))
