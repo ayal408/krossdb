@@ -116,7 +116,11 @@ class AbstractUnitOfWork(ABC):
         self._pending_events.clear()
 
     async def _persist_events(self, events: list[DomainEvent]) -> None:
-        """Default no-op; override to write into the transactional outbox table/collection."""
+        """Persist events transactionally; never silently discard registered events."""
+        raise NotImplementedError(
+            "Unit of Work does not implement transactional event persistence; "
+            "override _persist_events or do not register events"
+        )
 
     # -- backend hooks (implemented by concrete subclasses) ----------------------
 

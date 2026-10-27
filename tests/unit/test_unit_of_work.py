@@ -114,3 +114,27 @@ async def test_outbox_events_are_persisted_before_commit() -> None:
         uow.register_event(SomethingHappened())
         await uow.commit()
     assert uow.calls.index("persist_events") < uow.calls.index("commit")
+
+
+async def test_unimplemented_outbox_rejects_commit_and_rolls_back():
+    class NoEventPersistence(FakeUnitOfWork):
+        _persist_events = AbstractUnitOfWork._persist_events
+
+    uow = NoEventPersistence()
+    with pytest.raises(NotImplementedError, match="transactional event persistence"):
+        async with uow:
+            uow.register_event(SomethingHappened())
+            await uow.commit()
+
+    assert uow.calls == ["begin", "rollback"]
+    assert not uow._committed
+
+
+async def test_unimplemented_outbox_allows_commit_without_events():
+    class NoEventPersistence(FakeUnitOfWork):
+        _persist_events = AbstractUnitOfWork._persist_events
+
+    uow = NoEventPersistence()
+    async with uow:
+        await uow.commit()
+    assert uow.calls == ["begin", "commit"]
