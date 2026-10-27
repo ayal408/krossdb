@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import pytest
 
+from krossdb.events.outbox import SQLAlchemyOutboxStore
 from krossdb.interfaces.events import DomainEvent
 from krossdb.uow.sqlalchemy_uow import SQLAlchemyUnitOfWork
 
@@ -41,3 +42,18 @@ async def test_events_without_outbox_store_are_rejected():
     uow = SQLAlchemyUnitOfWork(adapter=None)
     with pytest.raises(NotImplementedError, match="transactional event persistence"):
         await uow._persist_events([OrderPlaced(order_id="order-1")])
+
+
+def test_rejects_sqlalchemy_outbox_store_with_different_adapter():
+    adapter = object()
+    other_adapter = object()
+    store = SQLAlchemyOutboxStore(other_adapter, table=None)
+    with pytest.raises(ValueError, match="same adapter"):
+        SQLAlchemyUnitOfWork(adapter, outbox_store=store)
+
+
+def test_accepts_sqlalchemy_outbox_store_with_same_adapter():
+    adapter = object()
+    store = SQLAlchemyOutboxStore(adapter, table=None)
+    uow = SQLAlchemyUnitOfWork(adapter, outbox_store=store)
+    assert uow.outbox_store is store
