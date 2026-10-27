@@ -187,6 +187,10 @@ class SQLAlchemyRepository(AbstractRepository[TModel, TId]):
         offset: int = 0,
         sort: Sequence[SortSpec] | None = None,
     ) -> Page[TModel]:
+        if limit <= 0:
+            raise ValueError("limit must be positive")
+        if offset < 0:
+            raise ValueError("offset must not be negative")
         stmt = _apply_criteria(select(self.table), self.table, criteria)
         if sort:
             for spec in sort:
