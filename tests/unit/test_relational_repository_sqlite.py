@@ -111,6 +111,28 @@ async def test_update_persists_changes(widget_sql_repo: SQLAlchemyRepository) ->
     assert refetched.quantity == 42
 
 
+async def test_update_readback_uses_master_not_replica(
+    sqlite_adapter: SQLiteAdapter, widget_sql_repo: SQLAlchemyRepository, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A successful update must not read back from a lagging replica."""
+    from contextlib import asynccontextmanager
+
+    widget = await widget_sql_repo.create(Widget(name="master-readback", quantity=1))
+    original_acquire = sqlite_adapter.acquire
+    roles: list[RoutingRole] = []
+
+    @asynccontextmanager
+    async def tracked_acquire(*, role: RoutingRole = RoutingRole.MASTER):
+        roles.append(role)
+        async with original_acquire(role=role) as session:
+            yield session
+
+    monkeypatch.setattr(sqlite_adapter, "acquire", tracked_acquire)
+    updated = await widget_sql_repo.update(widget.id, {"quantity": 12})
+    assert updated.quantity == 12
+    assert roles == [RoutingRole.MASTER, RoutingRole.MASTER]
+
+
 async def test_delete_is_committed_immediately_outside_a_uow(
     widget_sql_repo: SQLAlchemyRepository,
 ) -> None:
