@@ -78,15 +78,21 @@ class AbstractUnitOfWork(ABC):
         # Committing first would make business data visible without its events.
         try:
             await self._flush_events()
-            await self._commit()
         except BaseException:
-            if not self._finished:
+            try:
                 await self._rollback()
+            finally:
                 self._finished = True
                 self._pending_events.clear()
             raise
+        # A concrete backend may close the session even if commit fails.
+        # Never attempt a second rollback against that closed session.
+        try:
+            await self._commit()
+        finally:
+            self._finished = True
+            self._pending_events.clear()
         self._committed = True
-        self._finished = True
 
     async def rollback(self) -> None:
         if not self._active:
