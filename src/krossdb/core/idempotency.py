@@ -13,8 +13,8 @@ import asyncio
 import hashlib
 import json
 from collections.abc import Awaitable, Callable
-from weakref import WeakValueDictionary
 from typing import Any, TypeVar
+from weakref import WeakValueDictionary
 
 from pydantic import BaseModel
 
