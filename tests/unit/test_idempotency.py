@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from krossdb.core.exceptions import IdempotencyConflictError
@@ -133,3 +135,42 @@ async def test_equivalent_payload_key_order_replays(make_widget):
     await manager.run("ordered-key", {"a": 1, "b": 2}, operation, model_cls)
     await manager.run("ordered-key", {"b": 2, "a": 1}, operation, model_cls)
     assert calls == 1
+
+
+async def test_concurrent_requests_with_same_key_execute_once(make_widget):
+    manager = IdempotencyManager(FakeCache())
+    calls = 0
+
+    async def operation():
+        nonlocal calls
+        calls += 1
+        await asyncio.sleep(0)
+        return make_widget(name="once")
+
+    model_cls = type(make_widget())
+    results = await asyncio.gather(*(
+        manager.run("same-key", {"name": "once"}, operation, model_cls)
+        for _ in range(12)
+    ))
+    assert calls == 1
+    assert all(result.id == results[0].id for result in results)
+
+
+async def test_concurrent_conflicting_payload_is_rejected(make_widget):
+    manager = IdempotencyManager(FakeCache())
+    calls = 0
+
+    async def operation():
+        nonlocal calls
+        calls += 1
+        await asyncio.sleep(0)
+        return make_widget(name="first")
+
+    model_cls = type(make_widget())
+    results = await asyncio.gather(
+        manager.run("same-key", {"name": "first"}, operation, model_cls),
+        manager.run("same-key", {"name": "second"}, operation, model_cls),
+        return_exceptions=True,
+    )
+    assert calls == 1
+    assert isinstance(results[1], IdempotencyConflictError)
