@@ -27,17 +27,34 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from krossdb.adapters.relational.base import SQLAlchemyAdapter
 from krossdb.core.enums import RoutingRole
 from krossdb.core.exception_mapper import translate_exceptions
+from krossdb.interfaces.events import AbstractOutboxStore, DomainEvent, OutboxRecord
 from krossdb.interfaces.unit_of_work import AbstractUnitOfWork
 
 
 class SQLAlchemyUnitOfWork(AbstractUnitOfWork):
     """Binds one :class:`AsyncSession` (against the master node) per transaction."""
 
-    def __init__(self, adapter: SQLAlchemyAdapter) -> None:
+    def __init__(self, adapter: SQLAlchemyAdapter, *, outbox_store: AbstractOutboxStore | None = None) -> None:
         super().__init__()
         self.adapter = adapter
+        self.outbox_store = outbox_store
         self.session: AsyncSession | None = None
         self._bind_token: Token[AsyncSession | None] | None = None
+
+    async def _persist_events(self, events: list[DomainEvent]) -> None:
+        if self.outbox_store is None:
+            await super()._persist_events(events)
+            return
+        records = [
+            OutboxRecord(
+                id=event.event_id,
+                event_type=event.event_type,
+                payload=event.model_dump(mode="json"),
+                created_at=event.occurred_at,
+            )
+            for event in events
+        ]
+        await self.outbox_store.save(records)
 
     async def _begin(self) -> None:
         key = self.adapter._select_key(RoutingRole.MASTER)
