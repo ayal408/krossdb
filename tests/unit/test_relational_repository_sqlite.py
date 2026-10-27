@@ -274,6 +274,14 @@ async def test_find_with_criteria_and_pagination(widget_sql_repo: SQLAlchemyRepo
     assert page.has_more is True
 
 
+@pytest.mark.parametrize("limit,offset", [(0, 0), (-1, 0), (10, -1)])
+async def test_find_rejects_invalid_pagination(
+    widget_sql_repo: SQLAlchemyRepository, limit: int, offset: int
+) -> None:
+    with pytest.raises(ValueError):
+        await widget_sql_repo.find(limit=limit, offset=offset)
+
+
 async def test_find_with_plain_dict_criteria_is_still_supported(
     widget_sql_repo: SQLAlchemyRepository,
 ) -> None:
