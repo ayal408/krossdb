@@ -16,7 +16,7 @@ from collections.abc import AsyncIterator
 
 import pytest
 import pytest_asyncio
-from sqlalchemy import Column, DateTime, Integer, MetaData, String, Table, Uuid, text
+from sqlalchemy import Column, DateTime, Integer, MetaData, String, Table, Text, Uuid, select, text
 
 pytest.importorskip("asyncpg")
 pytest.importorskip("sqlalchemy.ext.asyncio")
@@ -26,6 +26,8 @@ from krossdb.core.config import ConnectionConfig, NodeConfig
 from krossdb.core.enums import DatabaseKind, RoutingRole
 from krossdb.core.exception_mapper import translate_exceptions
 from krossdb.core.exceptions import DuplicateRecordError, RecordNotFoundError
+from krossdb.events.outbox import SQLAlchemyOutboxStore
+from krossdb.interfaces.events import DomainEvent
 from krossdb.models.base import Entity
 from krossdb.repositories.relational_repository import SQLAlchemyRepository
 from krossdb.uow.sqlalchemy_uow import SQLAlchemyUnitOfWork
@@ -44,6 +46,21 @@ _widgets_table = Table(
     Column("name", String, unique=True),
     Column("quantity", Integer),
 )
+
+_outbox_table = Table(
+    "outbox_pg_it",
+    _metadata,
+    Column("id", String, primary_key=True),
+    Column("event_type", String, nullable=False),
+    Column("payload", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("published_at", DateTime(timezone=True), nullable=True),
+    Column("attempts", Integer, nullable=False),
+)
+
+
+class WidgetCreated(DomainEvent):
+    widget_id: str
 
 
 class Widget(Entity):
@@ -172,3 +189,44 @@ async def test_health_check_against_real_postgres(pg_adapter: PostgresAdapter) -
     result = await pg_adapter.health_check()
 
     assert str(result.status) == "healthy"
+
+
+async def test_uow_outbox_event_and_business_row_commit_atomically(
+    pg_adapter: PostgresAdapter, widget_repo: SQLAlchemyRepository
+) -> None:
+    widget = Widget(name=f"outbox-commit-{uuid.uuid4()}", quantity=1)
+    event = WidgetCreated(widget_id=str(widget.id))
+    store = SQLAlchemyOutboxStore(pg_adapter, _outbox_table)
+
+    async with SQLAlchemyUnitOfWork(pg_adapter, outbox_store=store) as uow:
+        await widget_repo.create(widget)
+        uow.register_event(event)
+        await uow.commit()
+
+    assert await widget_repo.get_by_id(widget.id) is not None
+    async with pg_adapter.acquire() as session:
+        row = (await session.execute(
+            select(_outbox_table).where(_outbox_table.c.id == str(event.event_id))
+        )).mappings().one()
+    assert row["event_type"] == "WidgetCreated"
+    assert str(widget.id) in row["payload"]
+
+
+async def test_uow_outbox_event_and_business_row_roll_back_atomically(
+    pg_adapter: PostgresAdapter, widget_repo: SQLAlchemyRepository
+) -> None:
+    widget = Widget(name=f"outbox-rollback-{uuid.uuid4()}", quantity=1)
+    event = WidgetCreated(widget_id=str(widget.id))
+    store = SQLAlchemyOutboxStore(pg_adapter, _outbox_table)
+
+    async with SQLAlchemyUnitOfWork(pg_adapter, outbox_store=store) as uow:
+        await widget_repo.create(widget)
+        uow.register_event(event)
+        await uow.rollback()
+
+    assert await widget_repo.get_by_id(widget.id) is None
+    async with pg_adapter.acquire() as session:
+        rows = (await session.execute(
+            select(_outbox_table).where(_outbox_table.c.id == str(event.event_id))
+        )).all()
+    assert rows == []
