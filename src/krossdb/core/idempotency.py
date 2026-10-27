@@ -23,7 +23,7 @@ T = TypeVar("T", bound=BaseModel)
 
 
 def _fingerprint(payload: dict[str, Any]) -> str:
-    canonical = json.dumps(payload, sort_keys=True, default=str)
+    canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
@@ -31,6 +31,10 @@ class IdempotencyManager:
     """Coordinates idempotency-key replay detection for any repository/adapter."""
 
     def __init__(self, cache: AbstractCache, *, ttl_seconds: int = 86_400, namespace: str = "idem") -> None:
+        if ttl_seconds <= 0:
+            raise ValueError("ttl_seconds must be positive")
+        if not namespace:
+            raise ValueError("namespace must not be empty")
         self._cache = cache
         self._ttl_seconds = ttl_seconds
         self._namespace = namespace
@@ -52,6 +56,8 @@ class IdempotencyManager:
         *different* payload, raises :class:`IdempotencyConflictError`.
         """
 
+        if not idempotency_key:
+            raise ValueError("idempotency_key must not be empty")
         cache_key = self._cache_key(idempotency_key)
         fingerprint = _fingerprint(request_payload)
 
