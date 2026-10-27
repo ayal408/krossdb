@@ -27,6 +27,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from krossdb.adapters.relational.base import SQLAlchemyAdapter
 from krossdb.core.enums import RoutingRole
 from krossdb.core.exception_mapper import translate_exceptions
+from krossdb.events.outbox import SQLAlchemyOutboxStore
 from krossdb.interfaces.events import AbstractOutboxStore, DomainEvent, OutboxRecord
 from krossdb.interfaces.unit_of_work import AbstractUnitOfWork
 
@@ -36,6 +37,11 @@ class SQLAlchemyUnitOfWork(AbstractUnitOfWork):
 
     def __init__(self, adapter: SQLAlchemyAdapter, *, outbox_store: AbstractOutboxStore | None = None) -> None:
         super().__init__()
+        if isinstance(outbox_store, SQLAlchemyOutboxStore) and outbox_store.adapter is not adapter:
+            raise ValueError(
+                "SQLAlchemyOutboxStore must use the same adapter as the Unit of Work "
+                "to guarantee transactional event persistence"
+            )
         self.adapter = adapter
         self.outbox_store = outbox_store
         self.session: AsyncSession | None = None
