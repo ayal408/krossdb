@@ -74,10 +74,25 @@ class AbstractUnitOfWork(ABC):
     async def commit(self) -> None:
         if not self._active:
             raise NoActiveTransactionError("commit() called with no active transaction")
-        await self._commit()
+        # Persist pending outbox events while the transaction is still open.
+        # Committing first would make business data visible without its events.
+        try:
+            await self._flush_events()
+        except BaseException:
+            try:
+                await self._rollback()
+            finally:
+                self._finished = True
+                self._pending_events.clear()
+            raise
+        # A concrete backend may close the session even if commit fails.
+        # Never attempt a second rollback against that closed session.
+        try:
+            await self._commit()
+        finally:
+            self._finished = True
+            self._pending_events.clear()
         self._committed = True
-        self._finished = True
-        await self._flush_events()
 
     async def rollback(self) -> None:
         if not self._active:

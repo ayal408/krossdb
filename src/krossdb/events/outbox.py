@@ -67,7 +67,8 @@ class SQLAlchemyOutboxStore(AbstractOutboxStore):
                             attempts=record.attempts,
                         )
                     )
-                await session.commit()
+                # The adapter owns commits outside a UoW; inside a UoW
+                # committing here would prematurely commit business changes.
 
     async def fetch_unpublished(self, *, limit: int = 100) -> list[OutboxRecord]:
         stmt = (
@@ -104,7 +105,8 @@ class SQLAlchemyOutboxStore(AbstractOutboxStore):
         async with self.adapter.acquire() as session:
             with translate_exceptions(table=self.table.name, op="outbox_mark_published"):
                 await session.execute(stmt)
-                await session.commit()
+                # The adapter owns commits outside a UoW; inside a UoW
+                # committing here would prematurely commit business changes.
 
 
 __all__ = ["InMemoryOutboxStore", "SQLAlchemyOutboxStore"]
