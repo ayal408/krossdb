@@ -9,10 +9,12 @@ unrelated requests).
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 from collections.abc import Awaitable, Callable
 from typing import Any, TypeVar
+from weakref import WeakValueDictionary
 
 from pydantic import BaseModel
 
@@ -38,6 +40,8 @@ class IdempotencyManager:
         self._cache = cache
         self._ttl_seconds = ttl_seconds
         self._namespace = namespace
+        # In-process coordination only; not a distributed lock.
+        self._locks: WeakValueDictionary[str, asyncio.Lock] = WeakValueDictionary()
 
     def _cache_key(self, idempotency_key: str) -> str:
         return f"{self._namespace}:{idempotency_key}"
@@ -61,20 +65,27 @@ class IdempotencyManager:
         cache_key = self._cache_key(idempotency_key)
         fingerprint = _fingerprint(request_payload)
 
-        cached = await self._cache.get(cache_key)
-        if cached is not None:
-            record = json.loads(cached)
-            if record["fingerprint"] != fingerprint:
-                raise IdempotencyConflictError(
-                    f"Idempotency key {idempotency_key!r} was replayed with a different payload",
-                    context={"idempotency_key": idempotency_key},
-                )
-            return model.model_validate_json(record["result"])
+        # Serialize competing calls within this manager instance. Distributed
+        # workers still require a shared atomic store/lock.
+        lock = self._locks.get(cache_key)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._locks[cache_key] = lock
+        async with lock:
+            cached = await self._cache.get(cache_key)
+            if cached is not None:
+                record = json.loads(cached)
+                if record["fingerprint"] != fingerprint:
+                    raise IdempotencyConflictError(
+                        f"Idempotency key {idempotency_key!r} was replayed with a different payload",
+                        context={"idempotency_key": idempotency_key},
+                    )
+                return model.model_validate_json(record["result"])
 
-        result = await operation()
-        envelope = json.dumps({"fingerprint": fingerprint, "result": result.model_dump_json()})
-        await self._cache.set(cache_key, envelope.encode("utf-8"), ttl_seconds=self._ttl_seconds)
-        return result
+            result = await operation()
+            envelope = json.dumps({"fingerprint": fingerprint, "result": result.model_dump_json()})
+            await self._cache.set(cache_key, envelope.encode("utf-8"), ttl_seconds=self._ttl_seconds)
+            return result
 
 
 __all__ = ["IdempotencyManager"]
