@@ -13,7 +13,7 @@ import json
 import uuid
 from datetime import UTC, datetime
 
-from sqlalchemy import Table, select, update
+from sqlalchemy import JSON, Table, select, update
 
 from krossdb.adapters.relational.base import SQLAlchemyAdapter
 from krossdb.core.exception_mapper import translate_exceptions
@@ -65,7 +65,7 @@ class SQLAlchemyOutboxStore(AbstractOutboxStore):
                             event_type=record.event_type,
                             payload=(
                                 record.payload
-                                if self.table.c.payload.type.__class__.__name__ in {"JSON", "JSONB"}
+                                if isinstance(self.table.c.payload.type, JSON)
                                 else json.dumps(record.payload)
                             ),
                             created_at=record.created_at,
