@@ -161,9 +161,15 @@ class SQLAlchemyRepository(AbstractRepository[TModel, TId]):
             # exists but fails extra_criteria (e.g. belongs to another tenant)
             # must not leak its existence through a different error branch.
             raise RecordNotFoundError(self.model.__name__, id_)
-        updated = await self.get_by_id(id_)
-        assert updated is not None  # we just confirmed the row exists via rowcount
-        return updated
+        # Read from the master: replicas can lag behind a successful write.
+        # Within a Unit of Work, acquire() reuses the transaction-bound session.
+        read_stmt = select(self.table).where(self.table.c[self.id_column] == id_)
+        async with self.adapter.acquire(role=RoutingRole.MASTER) as session:
+            with translate_exceptions(table=self.table.name, op="update_readback"):
+                row = (await session.execute(read_stmt)).mappings().first()
+        if row is None:
+            raise RecordNotFoundError(self.model.__name__, id_)
+        return self._row_to_model(row)
 
     async def delete(self, id_: TId, *, extra_criteria: Specification | None = None) -> bool:
         stmt = delete(self.table).where(self.table.c[self.id_column] == id_)
