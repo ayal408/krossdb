@@ -98,3 +98,38 @@ async def test_different_keys_do_not_collide(make_widget):
     await manager.run("key-2", {"n": 2}, operation, model_cls)
 
     assert calls == 2
+
+
+@pytest.mark.parametrize("ttl,namespace", [(0, "idem"), (-1, "idem"), (10, "")])
+def test_invalid_manager_configuration_is_rejected(ttl, namespace):
+    with pytest.raises(ValueError):
+        IdempotencyManager(FakeCache(), ttl_seconds=ttl, namespace=namespace)
+
+
+async def test_empty_idempotency_key_is_rejected(make_widget):
+    manager = IdempotencyManager(FakeCache())
+    called = False
+
+    async def operation():
+        nonlocal called
+        called = True
+        return make_widget(name="invalid")
+
+    with pytest.raises(ValueError, match="idempotency_key"):
+        await manager.run("", {"name": "invalid"}, operation, type(make_widget()))
+    assert not called
+
+
+async def test_equivalent_payload_key_order_replays(make_widget):
+    manager = IdempotencyManager(FakeCache())
+    calls = 0
+
+    async def operation():
+        nonlocal calls
+        calls += 1
+        return make_widget(name="ordered")
+
+    model_cls = type(make_widget())
+    await manager.run("ordered-key", {"a": 1, "b": 2}, operation, model_cls)
+    await manager.run("ordered-key", {"b": 2, "a": 1}, operation, model_cls)
+    assert calls == 1
