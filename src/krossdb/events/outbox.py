@@ -63,7 +63,11 @@ class SQLAlchemyOutboxStore(AbstractOutboxStore):
                         self.table.insert().values(
                             id=str(record.id),
                             event_type=record.event_type,
-                            payload=json.dumps(record.payload),
+                            payload=(
+                                record.payload
+                                if self.table.c.payload.type.__class__.__name__ in {"JSON", "JSONB"}
+                                else json.dumps(record.payload)
+                            ),
                             created_at=record.created_at,
                             published_at=record.published_at,
                             attempts=record.attempts,
@@ -90,7 +94,11 @@ class SQLAlchemyOutboxStore(AbstractOutboxStore):
             OutboxRecord(
                 id=uuid.UUID(str(row["id"])),
                 event_type=row["event_type"],
-                payload=json.loads(row["payload"]),
+                payload=(
+                    json.loads(row["payload"])
+                    if isinstance(row["payload"], str)
+                    else row["payload"]
+                ),
                 created_at=row["created_at"],
                 published_at=row["published_at"],
                 attempts=row["attempts"],
