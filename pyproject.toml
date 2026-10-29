@@ -91,6 +91,7 @@ minversion = "8.0"
 addopts = "-ra --strict-markers --strict-config --cov=krossdb --cov-report=term-missing:skip-covered"
 testpaths = ["tests"]
 asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
 markers = [
     "unit: fast, isolated tests with mocked adapters",
     "integration: tests that spin up real services via Testcontainers",
