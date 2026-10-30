@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-30
+
+First release cut from `main` since 0.1.0. (0.2.0 on PyPI was published
+from the `feature/generic-schema-migrations` branch and is superseded by
+this release.)
+
 ### Security
 
 - **Fixed a tenant-isolation bypass in `TenantScopedRepository`**: `update()`

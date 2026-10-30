@@ -33,7 +33,7 @@ from krossdb.interfaces.repository import AbstractRepository, BulkResult, Page, 
 from krossdb.interfaces.unit_of_work import AbstractUnitOfWork
 from krossdb.models.base import AuditRecord, Entity
 
-__version__ = "0.1.0"
+__version__ = "0.3.0"
 
 __all__ = [
     "__version__",
