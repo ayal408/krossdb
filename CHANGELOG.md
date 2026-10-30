@@ -40,6 +40,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   entries in `BulkResult.failed`, giving visibility into rejected cross-tenant
   attempts instead of a silent no-op.
 
+### Fixed
+
+- `DatabaseFactory.connect_all()` (and therefore `async with DatabaseFactory(...)`)
+  no longer leaks connections when one adapter fails to connect: the failed
+  adapter's partially created resources and every adapter connected before it
+  are now disconnected before the error propagates.
+- The test suite no longer aborts at startup under pytest-asyncio 1.x, which
+  warns when `asyncio_default_fixture_loop_scope` is unset (turned into an
+  error by `filterwarnings = ["error"]`); the scope is now set to `function`.
+
 ### Changed
 
 - Bumped minimum versions of all runtime and dev dependencies to their

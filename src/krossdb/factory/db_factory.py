@@ -85,12 +85,35 @@ class DatabaseFactory:
         self._adapters: dict[str, AbstractDatabaseAdapter[Any]] = {}
 
     async def connect_all(self) -> None:
-        for name, config in self._configs.items():
-            adapter_cls = _resolve_adapter_class(config.kind)
-            adapter = adapter_cls(config)
-            await adapter.connect()
-            self._adapters[name] = adapter
-            _logger.info("factory.adapter_connected", name=name, kind=str(config.kind))
+        """Connect every configured adapter, or none of them.
+
+        If any adapter fails to connect, the failed adapter's partially
+        acquired resources and every adapter connected before it are released
+        before the error propagates; ``async with`` never reaches
+        ``__aexit__`` when ``__aenter__`` raises, so nobody else would.
+        """
+
+        try:
+            for name, config in self._configs.items():
+                adapter_cls = _resolve_adapter_class(config.kind)
+                adapter = adapter_cls(config)
+                try:
+                    await adapter.connect()
+                except BaseException:
+                    await self._disconnect_quietly(name, adapter)
+                    raise
+                self._adapters[name] = adapter
+                _logger.info("factory.adapter_connected", name=name, kind=str(config.kind))
+        except BaseException:
+            await self.disconnect_all()
+            raise
+
+    @staticmethod
+    async def _disconnect_quietly(name: str, adapter: AbstractDatabaseAdapter[Any]) -> None:
+        try:
+            await adapter.disconnect()
+        except Exception as exc:
+            _logger.error("factory.disconnect_failed", name=name, error=str(exc))
 
     async def disconnect_all(self) -> None:
         for name, adapter in self._adapters.items():

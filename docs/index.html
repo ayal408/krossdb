@@ -384,7 +384,7 @@
       <div class="feature-card">
         <span class="tag">Data access</span>
         <h3>Repository + Unit of Work</h3>
-        <p>The same CRUD and query surface across every backend, with atomic multi-write transactions via <code class="inline">SQLAlchemyUnitOfWork</code>.</p>
+        <p>The same CRUD and query surface across every backend, with atomic multi-write transactions via <code class="inline">SQLAlchemyUnitOfWork</code>. <code class="inline">DatabaseFactory</code> connects every adapter or none: if one fails, the ones already opened are closed again.</p>
       </div>
       <div class="feature-card">
         <span class="tag">Consistency</span>
@@ -394,22 +394,22 @@
       <div class="feature-card">
         <span class="tag">Resilience</span>
         <h3>Circuit breaker + backoff</h3>
-        <p>Exponential-backoff retry and a circuit breaker sit in front of every adapter call, tuned per connection.</p>
+        <p>Exponential-backoff retry and a per-node circuit breaker guard connection setup and health checks, tuned per connection.</p>
       </div>
       <div class="feature-card">
         <span class="tag">Multi-tenancy</span>
         <h3>Transparent tenant isolation</h3>
-        <p><code class="inline">TenantScopedRepository</code> injects tenant filtering automatically, driven by contextvar-based tenant context.</p>
+        <p><code class="inline">TenantScopedRepository</code> injects tenant filtering automatically, driven by contextvar-based tenant context. Writes are scoped to the tenant in the same statement, and a record can't be moved to another tenant.</p>
       </div>
       <div class="feature-card">
         <span class="tag">Caching</span>
         <h3>Redis cache-aside</h3>
-        <p>A drop-in cache-aside layer plus a generic idempotency-key manager for safe write retries.</p>
+        <p>A drop-in cache-aside layer plus a generic idempotency-key manager for safe write retries: a replayed key returns the original result, a reused key with a different payload is rejected.</p>
       </div>
       <div class="feature-card">
         <span class="tag">Events</span>
         <h3>Dispatcher + outbox</h3>
-        <p>An in-process event dispatcher and a transactional outbox — in-memory or SQL table-backed — for reliable side effects.</p>
+        <p>An in-process event dispatcher and a transactional outbox — in-memory or SQL table-backed. When a Unit of Work is given an outbox store, the domain events it raises are written to the outbox in the same transaction as the business data, so both commit or roll back together.</p>
       </div>
       <div class="feature-card">
         <span class="tag">Observability</span>
@@ -508,7 +508,7 @@ config = ConnectionConfig(
   <section>
     <div class="section-head">
       <span class="eyebrow">Testing</span>
-      <h2>159 tests, 86%+ coverage</h2>
+      <h2>320 tests, ~90% coverage</h2>
       <p>Integration tests spin up real Postgres/MongoDB/Qdrant via Testcontainers and are
         skipped automatically when Docker isn't reachable — <code class="inline">pytest -m unit</code>
         never fails because of them.</p>

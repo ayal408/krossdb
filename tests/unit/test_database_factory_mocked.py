@@ -9,6 +9,8 @@ behavior is covered separately by the Testcontainers integration tests).
 
 from __future__ import annotations
 
+from typing import ClassVar
+
 import pytest
 
 from krossdb.core.config import ConnectionConfig, NodeConfig
@@ -121,3 +123,42 @@ async def test_health_check_all_returns_one_result_per_connection():
     assert all(r.status == HealthStatus.HEALTHY for r in results.values())
 
     await factory.disconnect_all()
+
+
+class FailingAdapter(FakeAdapter):
+    instances: ClassVar[list[FailingAdapter]] = []
+
+    def __init__(self, config: ConnectionConfig) -> None:
+        super().__init__(config)
+        FailingAdapter.instances.append(self)
+
+    async def connect(self) -> None:
+        self.connect_calls += 1
+        if self.config.name == "broken":
+            raise ConnectionError("cannot reach backend")
+        self._connected = True
+
+
+async def test_connect_all_failure_releases_already_connected_adapters():
+    FailingAdapter.instances = []
+    register_adapter(DatabaseKind.POSTGRESQL, FailingAdapter)
+    factory = DatabaseFactory([_config("primary"), _config("secondary"), _config("broken")])
+
+    with pytest.raises(ConnectionError):
+        await factory.connect_all()
+
+    assert [a.config.name for a in FailingAdapter.instances] == ["primary", "secondary", "broken"]
+    assert all(a.disconnect_calls == 1 for a in FailingAdapter.instances)
+    assert "primary" not in factory
+    assert "secondary" not in factory
+
+
+async def test_async_with_failure_releases_already_connected_adapters():
+    FailingAdapter.instances = []
+    register_adapter(DatabaseKind.POSTGRESQL, FailingAdapter)
+
+    with pytest.raises(ConnectionError):
+        async with DatabaseFactory([_config("primary"), _config("broken")]):
+            pytest.fail("body must not run when connecting fails")
+
+    assert all(a.disconnect_calls == 1 for a in FailingAdapter.instances)
