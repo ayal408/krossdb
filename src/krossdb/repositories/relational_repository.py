@@ -127,10 +127,14 @@ class SQLAlchemyRepository(AbstractRepository[TModel, TId]):
 
     async def get_by_id(self, id_: TId) -> TModel | None:
         stmt = select(self.table).where(self.table.c[self.id_column] == id_)
-        async with self.adapter.acquire(role=RoutingRole.REPLICA) as session:
-            with translate_exceptions(table=self.table.name, op="get_by_id"):
-                result = await session.execute(stmt)
-            row = result.mappings().first()
+
+        async def _read() -> RowMapping | None:
+            async with self.adapter.acquire(role=RoutingRole.REPLICA) as session:
+                with translate_exceptions(table=self.table.name, op="get_by_id"):
+                    result = await session.execute(stmt)
+                return result.mappings().first()
+
+        row = await self.adapter.run_read(_read, operation_name=f"{self.table.name}.get_by_id")
         return self._row_to_model(row) if row is not None else None
 
     async def create(self, entity: TModel, *, idempotency_key: str | None = None) -> TModel:
@@ -198,20 +202,28 @@ class SQLAlchemyRepository(AbstractRepository[TModel, TId]):
                 stmt = stmt.order_by(column.desc() if spec.descending else column.asc())
 
         count_stmt = select(func.count()).select_from(stmt.subquery())
+        page_stmt = stmt.limit(limit).offset(offset)
 
-        async with self.adapter.acquire(role=RoutingRole.REPLICA) as session:
-            with translate_exceptions(table=self.table.name, op="find"):
-                total = (await session.execute(count_stmt)).scalar_one()
-                result = await session.execute(stmt.limit(limit).offset(offset))
-            items = [self._row_to_model(row) for row in result.mappings().all()]
+        async def _read() -> tuple[int, Sequence[RowMapping]]:
+            async with self.adapter.acquire(role=RoutingRole.REPLICA) as session:
+                with translate_exceptions(table=self.table.name, op="find"):
+                    total = (await session.execute(count_stmt)).scalar_one()
+                    result = await session.execute(page_stmt)
+                return total, result.mappings().all()
 
+        total, rows = await self.adapter.run_read(_read, operation_name=f"{self.table.name}.find")
+        items = [self._row_to_model(row) for row in rows]
         return Page(items=items, total=total, limit=limit, offset=offset)
 
     async def count(self, criteria: Mapping[str, Any] | Specification | None = None) -> int:
         stmt = _apply_criteria(select(func.count()).select_from(self.table), self.table, criteria)
-        async with self.adapter.acquire(role=RoutingRole.REPLICA) as session:
-            with translate_exceptions(table=self.table.name, op="count"):
-                return (await session.execute(stmt)).scalar_one()
+
+        async def _read() -> int:
+            async with self.adapter.acquire(role=RoutingRole.REPLICA) as session:
+                with translate_exceptions(table=self.table.name, op="count"):
+                    return int((await session.execute(stmt)).scalar_one())
+
+        return await self.adapter.run_read(_read, operation_name=f"{self.table.name}.count")
 
     async def bulk_create(
         self, entities: Sequence[TModel], *, idempotency_key: str | None = None

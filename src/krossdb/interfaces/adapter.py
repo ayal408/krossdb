@@ -9,7 +9,7 @@ about the repository/domain layer above it.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import AbstractAsyncContextManager
 from typing import Generic, TypeVar
 
@@ -18,6 +18,9 @@ from pydantic import BaseModel, ConfigDict, Field
 from krossdb.core.config import ConnectionConfig
 from krossdb.core.enums import DatabaseKind, HealthStatus, RoutingRole
 from krossdb.core.logging import get_logger
+from krossdb.resilience.retry import with_retry
+
+T = TypeVar("T")
 
 TConnection = TypeVar("TConnection")
 """The native connection/session/client type a concrete adapter wraps
@@ -84,6 +87,19 @@ class AbstractDatabaseAdapter(ABC, Generic[TConnection]):
         routes to a read replica when the adapter/config has one configured
         and falls back to master otherwise (never the other way around).
         """
+
+    async def run_read(self, fn: Callable[[], Awaitable[T]], *, operation_name: str) -> T:
+        """Run an idempotent read, retrying transient failures per ``config.retry``.
+
+        ``fn`` must acquire its own connection, so each attempt goes back
+        through :meth:`acquire` (and its circuit breaker). Only reads go
+        through here: a write whose connection drops after the server applied
+        it would be applied twice if retried.
+        """
+
+        return await with_retry(
+            fn, config=self.config.retry, operation_name=f"{self.config.name}.{operation_name}"
+        )
 
     # -- observability -------------------------------------------------------
 

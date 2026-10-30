@@ -2,9 +2,13 @@
 
 Each configured node gets its own pooled :class:`AsyncEngine`. Writes always
 route to the single master node; reads route to a weighted-round-robin
-replica pool when replicas are configured, falling back to master otherwise.
-The master node's connectivity is verified eagerly on :meth:`connect` (through
-retry + circuit breaker) since a missing master is a startup-time
+replica pool when replicas are configured, falling back to master otherwise
+(or when the chosen replica's circuit breaker is open). Every ``acquire()``
+runs under that node's circuit breaker, which counts only infrastructure
+failures (lost connections, timeouts); idempotent reads issued through
+:meth:`run_read` are additionally retried with backoff. The master node's
+connectivity is verified eagerly on :meth:`connect` (through retry + circuit
+breaker) since a missing master is a startup-time
 configuration problem; replicas are verified lazily (SQLAlchemy's
 ``pool_pre_ping``) since a temporarily down replica shouldn't block startup.
 """
@@ -12,9 +16,10 @@ configuration problem; replicas are verified lazily (SQLAlchemy's
 from __future__ import annotations
 
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from contextvars import ContextVar, Token
+from typing import TypeVar
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
@@ -30,8 +35,10 @@ from krossdb.core.enums import HealthStatus, RoutingRole
 from krossdb.core.exception_mapper import translate_exceptions
 from krossdb.core.exceptions import CircuitBreakerOpenError, ConfigurationError
 from krossdb.interfaces.adapter import AbstractDatabaseAdapter, HealthCheckResult
-from krossdb.resilience.circuit_breaker import CircuitBreaker
+from krossdb.resilience.circuit_breaker import INFRASTRUCTURE_FAILURES, CircuitBreaker
 from krossdb.resilience.retry import with_retry
+
+T = TypeVar("T")
 
 
 class SQLAlchemyAdapter(AbstractDatabaseAdapter[AsyncSession]):
@@ -122,11 +129,14 @@ class SQLAlchemyAdapter(AbstractDatabaseAdapter[AsyncSession]):
         await breaker.call(_guarded)
 
     def _select_key(self, role: RoutingRole) -> str:
+        if self._master_key is None:
+            raise ConfigurationError(f"connection {self.config.name!r} is not connected")
         if role is RoutingRole.MASTER or self._replica_balancer is None:
-            if self._master_key is None:
-                raise ConfigurationError(f"connection {self.config.name!r} is not connected")
             return self._master_key
-        return self._replica_balancer.next()
+        key = self._replica_balancer.next()
+        # An open replica breaker would only fail fast; the master can serve
+        # the read instead (never the other way round).
+        return key if self._breakers[key].allows_calls else self._master_key
 
     def bind_session(self, session: AsyncSession) -> Token[AsyncSession | None]:
         """Pin every subsequent ``acquire()`` in this task to ``session`` (used by the UoW)."""
@@ -150,23 +160,39 @@ class SQLAlchemyAdapter(AbstractDatabaseAdapter[AsyncSession]):
 
         bound = self._active_session.get()
         if bound is not None:
-            with translate_exceptions(adapter=str(self.config.kind), connection=self.config.name):
-                yield bound
+            # A UoW session is always pinned to the master node.
+            async with self._breakers[self._select_key(RoutingRole.MASTER)].guard(
+                failure_types=INFRASTRUCTURE_FAILURES
+            ):
+                with translate_exceptions(adapter=str(self.config.kind), connection=self.config.name):
+                    yield bound
             return
 
         key = self._select_key(role)
-        session = self._session_factories[key]()
-        try:
+        async with self._breakers[key].guard(failure_types=INFRASTRUCTURE_FAILURES):
+            session = self._session_factories[key]()
             try:
-                with translate_exceptions(adapter=str(self.config.kind), connection=self.config.name, node=key):
-                    yield session
-            except Exception:
-                await session.rollback()
-                raise
-            else:
-                await session.commit()
-        finally:
-            await session.close()
+                try:
+                    with translate_exceptions(adapter=str(self.config.kind), connection=self.config.name, node=key):
+                        yield session
+                except Exception:
+                    await session.rollback()
+                    raise
+                else:
+                    with translate_exceptions(
+                        adapter=str(self.config.kind), connection=self.config.name, node=key, op="commit"
+                    ):
+                        await session.commit()
+            finally:
+                await session.close()
+
+    async def run_read(self, fn: Callable[[], Awaitable[T]], *, operation_name: str) -> T:
+        # Inside a Unit of Work a failed statement has already broken the
+        # transaction; retrying on the same session can't succeed, and the
+        # caller must roll back and start over anyway.
+        if self._active_session.get() is not None:
+            return await fn()
+        return await super().run_read(fn, operation_name=operation_name)
 
     async def health_check(self) -> HealthCheckResult:
         start = time.monotonic()

@@ -8,6 +8,7 @@ tests/integration/test_qdrant_container.py for that).
 from __future__ import annotations
 
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
@@ -18,6 +19,12 @@ from krossdb.models.base import Entity
 from krossdb.repositories.vector_repository import QdrantRepository
 
 pytestmark = pytest.mark.unit
+
+
+async def _run_read_once(fn: Any, *, operation_name: str) -> Any:
+    """Stands in for ``AbstractDatabaseAdapter.run_read`` without the retry loop."""
+
+    return await fn()
 
 
 class EmbeddedWidget(Entity):
@@ -56,6 +63,7 @@ def mock_adapter(mock_client: MagicMock) -> MagicMock:
 
     adapter = MagicMock()
     adapter.acquire.return_value = acquire_cm
+    adapter.run_read = _run_read_once
     return adapter
 
 
