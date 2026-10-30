@@ -21,6 +21,12 @@ from tests.conftest import Widget
 pytestmark = pytest.mark.unit
 
 
+async def _run_read_once(fn: Any, *, operation_name: str) -> Any:
+    """Stands in for ``AbstractDatabaseAdapter.run_read`` without the retry loop."""
+
+    return await fn()
+
+
 class FakeCursor:
     """Mimics the chainable Motor cursor (``find().skip().limit().sort()``), async-iterable."""
 
@@ -68,6 +74,7 @@ def mock_adapter(mock_collection: MagicMock) -> MagicMock:
 
     adapter = MagicMock()
     adapter.acquire.return_value = acquire_cm
+    adapter.run_read = _run_read_once
     return adapter
 
 

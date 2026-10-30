@@ -127,11 +127,14 @@ class QdrantRepository(AbstractRepository[TModel, TId]):
         return self.model.model_validate(payload)
 
     async def get_by_id(self, id_: TId) -> TModel | None:
-        async with self.adapter.acquire() as client:
-            with translate_exceptions(collection=self.collection_name, op="get_by_id"):
-                points = await client.retrieve(
-                    self.collection_name, ids=[str(id_)], with_vectors=True
-                )
+        async def _read() -> list[Any]:
+            async with self.adapter.acquire() as client:
+                with translate_exceptions(collection=self.collection_name, op="get_by_id"):
+                    return list(
+                        await client.retrieve(self.collection_name, ids=[str(id_)], with_vectors=True)
+                    )
+
+        points = await self.adapter.run_read(_read, operation_name=f"{self.collection_name}.get_by_id")
         return self._point_to_model(points[0]) if points else None
 
     async def create(self, entity: TModel, *, idempotency_key: str | None = None) -> TModel:
@@ -185,29 +188,38 @@ class QdrantRepository(AbstractRepository[TModel, TId]):
         sort: Sequence[SortSpec] | None = None,
     ) -> Page[TModel]:
         query_filter = _criteria_to_filter(criteria)
-        async with self.adapter.acquire() as client:
-            with translate_exceptions(collection=self.collection_name, op="find"):
-                points, _ = await client.scroll(
-                    self.collection_name,
-                    scroll_filter=query_filter,
-                    limit=limit,
-                    offset=offset,
-                    with_vectors=True,
-                )
-                total = await client.count(self.collection_name, count_filter=query_filter)
+
+        async def _read() -> tuple[list[Any], int]:
+            async with self.adapter.acquire() as client:
+                with translate_exceptions(collection=self.collection_name, op="find"):
+                    points, _ = await client.scroll(
+                        self.collection_name,
+                        scroll_filter=query_filter,
+                        limit=limit,
+                        offset=offset,
+                        with_vectors=True,
+                    )
+                    total = await client.count(self.collection_name, count_filter=query_filter)
+                    return list(points), total.count
+
+        points, total = await self.adapter.run_read(_read, operation_name=f"{self.collection_name}.find")
         return Page(
             items=[self._point_to_model(p) for p in points],
-            total=total.count,
+            total=total,
             limit=limit,
             offset=offset,
         )
 
     async def count(self, criteria: Mapping[str, Any] | Specification | None = None) -> int:
         query_filter = _criteria_to_filter(criteria)
-        async with self.adapter.acquire() as client:
-            with translate_exceptions(collection=self.collection_name, op="count"):
-                result = await client.count(self.collection_name, count_filter=query_filter)
-        return result.count
+
+        async def _read() -> int:
+            async with self.adapter.acquire() as client:
+                with translate_exceptions(collection=self.collection_name, op="count"):
+                    result = await client.count(self.collection_name, count_filter=query_filter)
+                    return result.count
+
+        return await self.adapter.run_read(_read, operation_name=f"{self.collection_name}.count")
 
     async def bulk_create(
         self, entities: Sequence[TModel], *, idempotency_key: str | None = None
@@ -276,16 +288,21 @@ class QdrantRepository(AbstractRepository[TModel, TId]):
         """Similarity search: returns ``(entity, score)`` pairs ordered by relevance."""
 
         query_filter = _criteria_to_filter(criteria)
-        async with self.adapter.acquire() as client:
-            with translate_exceptions(collection=self.collection_name, op="search"):
-                result = await client.query_points(
-                    self.collection_name,
-                    query=list(vector),
-                    limit=limit,
-                    query_filter=query_filter,
-                    with_vectors=True,
-                )
-        return [(self._point_to_model(p), p.score) for p in result.points]
+
+        async def _read() -> list[Any]:
+            async with self.adapter.acquire() as client:
+                with translate_exceptions(collection=self.collection_name, op="search"):
+                    result = await client.query_points(
+                        self.collection_name,
+                        query=list(vector),
+                        limit=limit,
+                        query_filter=query_filter,
+                        with_vectors=True,
+                    )
+                    return list(result.points)
+
+        points = await self.adapter.run_read(_read, operation_name=f"{self.collection_name}.search")
+        return [(self._point_to_model(p), p.score) for p in points]
 
 
 __all__ = ["QdrantRepository"]

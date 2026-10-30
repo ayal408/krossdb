@@ -46,12 +46,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   no longer leaks connections when one adapter fails to connect: the failed
   adapter's partially created resources and every adapter connected before it
   are now disconnected before the error propagates.
+- Errors raised while committing a standalone (non-UoW) relational call are
+  now translated to `KrossDBError` subclasses like every other driver error,
+  instead of escaping as raw SQLAlchemy/driver exceptions.
+- A half-open circuit breaker no longer stays stuck at its probe limit when a
+  probe call is cancelled.
 - The test suite no longer aborts at startup under pytest-asyncio 1.x, which
   warns when `asyncio_default_fixture_loop_scope` is unset (turned into an
   error by `filterwarnings = ["error"]`); the scope is now set to `function`.
 
 ### Changed
 
+- **Circuit breakers and retries now protect queries, not just connection
+  setup.** Every adapter's `acquire()` runs under that node's circuit breaker,
+  which counts only infrastructure failures (`ConnectionError_`,
+  `ConnectionTimeoutError`, `TimeoutError_`): a constraint violation or a
+  missing record means the database answered and never opens the circuit.
+  While a breaker is open, calls fail fast with `CircuitBreakerOpenError`;
+  relational reads routed to a replica whose breaker is open go to the master
+  instead. Repository reads (`get_by_id`, `find`, `count`, and Qdrant's
+  `search`) are retried with the connection's `RetryConfig` via the new
+  `AbstractDatabaseAdapter.run_read()`; writes are never retried (a write whose
+  connection drops after the server applied it would be applied twice), and
+  nothing is retried inside a Unit of Work.
+- `AbstractOutboxStore.fetch_unpublished()` takes a `max_attempts` keyword, and
+  the ABC gains `record_failed_attempts()` and `claim()` with non-abstract
+  defaults. Custom stores must accept `max_attempts` to be used with
+  `OutboxRelay`, and implement `record_failed_attempts()` for it to track
+  failures.
 - Bumped minimum versions of all runtime and dev dependencies to their
   current releases (pydantic, SQLAlchemy, structlog, OpenTelemetry, tenacity,
   rich, anyio, the database drivers, and the pytest/mypy/ruff/pre-commit
@@ -91,6 +113,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `krossdb.events.relay.OutboxRelay`: drains an outbox store into a publish
+  callable (`run_once()` for one batch, `run()` as a polling loop with a stop
+  event). Successful records are marked published; failures increment
+  `attempts`, and records reaching `max_attempts` (default 10) are left in
+  the store, unpublished, for inspection. Delivery is at-least-once.
+- `SQLAlchemyOutboxStore` claims rows with `SELECT ... FOR UPDATE SKIP LOCKED`
+  inside a per-batch transaction (`claim()`), so several relays can run
+  against the same table without publishing a record twice. Verified against
+  real Postgres; SQLite has no row locks and ignores the clause.
+- `CircuitBreaker.guard()` (an async context manager with an optional
+  `failure_types` filter) and `CircuitBreaker.allows_calls`.
 - `krossdb.schema`: declarative table definitions in YAML/JSON (tables, columns,
   foreign keys, indexes) built into a real `sqlalchemy.MetaData` via
   `build_metadata`/`load_schema_config`, so the same file produces correct DDL on

@@ -127,6 +127,46 @@ file produces correct DDL on Postgres, MySQL, and SQLite. See
 and an index; `--metadata module.path:attribute_name` still works as before for
 code-defined `MetaData` objects — pass exactly one of `--schema` or `--metadata`.
 
+## Resilience
+
+Every adapter call goes through `acquire()`, which runs under a per-node
+circuit breaker. Only infrastructure failures (lost connections, timeouts)
+count against it, so a duplicate key never trips it. Once it opens, calls fail
+fast with `CircuitBreakerOpenError` until the recovery timeout passes; reads
+aimed at a replica whose breaker is open are sent to the master. Repository
+reads are also retried with exponential backoff (`ConnectionConfig.retry`).
+Writes are not retried, and nothing is retried inside a Unit of Work, where a
+failed statement has already broken the transaction.
+
+## Transactional outbox
+
+Give a Unit of Work an outbox store and the domain events it registers are
+written in the same transaction as the business data. `OutboxRelay` then
+delivers them:
+
+```python
+from krossdb.events.outbox import SQLAlchemyOutboxStore
+from krossdb.events.relay import OutboxRelay
+
+store = SQLAlchemyOutboxStore(adapter, outbox_table)
+
+async with SQLAlchemyUnitOfWork(adapter, outbox_store=store) as uow:
+    await orders.create(order)
+    uow.register_event(OrderPlaced(order_id=str(order.id)))
+    await uow.commit()
+
+async def send_to_broker(record):        # must raise if delivery fails
+    await broker.publish(record.event_type, record.payload, message_id=str(record.id))
+
+relay = OutboxRelay(store, send_to_broker, batch_size=100, max_attempts=10)
+await relay.run(stop=shutdown_event)     # or relay.run_once() from a scheduler
+```
+
+Each batch is claimed with `SELECT ... FOR UPDATE SKIP LOCKED`, so you can run
+several relays at once. Delivery is at-least-once, so consumers should dedupe
+on `record.id`. A record that fails `max_attempts` times stays in the table,
+unpublished, for you to inspect.
+
 ## CLI
 
 ```bash

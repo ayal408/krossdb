@@ -106,3 +106,78 @@ async def test_failure_during_half_open_reopens_immediately():
         await breaker.call(failing)
 
     assert breaker.state is CircuitState.OPEN
+
+
+async def test_guard_with_failure_types_ignores_non_infrastructure_errors():
+    from krossdb.core.exceptions import IntegrityViolationError
+    from krossdb.resilience.circuit_breaker import INFRASTRUCTURE_FAILURES
+
+    breaker = make_breaker(failure_threshold=1)
+
+    for _ in range(3):
+        with pytest.raises(IntegrityViolationError):
+            async with breaker.guard(failure_types=INFRASTRUCTURE_FAILURES):
+                raise IntegrityViolationError("duplicate key")
+
+    assert breaker.state is CircuitState.CLOSED
+
+
+async def test_guard_opens_on_infrastructure_errors_and_then_rejects_entry():
+    from krossdb.core.exceptions import ConnectionError_
+    from krossdb.resilience.circuit_breaker import INFRASTRUCTURE_FAILURES
+
+    breaker = make_breaker(failure_threshold=2, recovery_timeout_seconds=60)
+    for _ in range(2):
+        with pytest.raises(ConnectionError_):
+            async with breaker.guard(failure_types=INFRASTRUCTURE_FAILURES):
+                raise ConnectionError_("connection reset")
+
+    assert breaker.state is CircuitState.OPEN
+    assert not breaker.allows_calls
+    entered = False
+    with pytest.raises(CircuitBreakerOpenError):
+        async with breaker.guard(failure_types=INFRASTRUCTURE_FAILURES):
+            entered = True
+    assert not entered
+
+
+async def test_half_open_probe_answered_with_a_business_error_closes_the_breaker():
+    from krossdb.core.exceptions import ConnectionError_, RecordNotFoundError
+    from krossdb.resilience.circuit_breaker import INFRASTRUCTURE_FAILURES
+
+    breaker = make_breaker(failure_threshold=1, recovery_timeout_seconds=0.01)
+    with pytest.raises(ConnectionError_):
+        async with breaker.guard(failure_types=INFRASTRUCTURE_FAILURES):
+            raise ConnectionError_("down")
+    await asyncio.sleep(0.02)
+    assert breaker.allows_calls
+
+    with pytest.raises(RecordNotFoundError):
+        async with breaker.guard(failure_types=INFRASTRUCTURE_FAILURES):
+            raise RecordNotFoundError("Widget", "missing")
+
+    assert breaker.state is CircuitState.CLOSED
+
+
+async def test_cancelled_half_open_probe_frees_its_slot():
+    breaker = make_breaker(failure_threshold=1, recovery_timeout_seconds=0.01, half_open_max_calls=1)
+
+    async def failing():
+        raise ValueError("down")
+
+    with pytest.raises(ValueError):
+        await breaker.call(failing)
+    await asyncio.sleep(0.02)
+
+    probe = asyncio.create_task(breaker.call(asyncio.Event().wait))
+    await asyncio.sleep(0)
+    assert breaker.state is CircuitState.HALF_OPEN
+    probe.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await probe
+
+    async def ok():
+        return "recovered"
+
+    assert await breaker.call(ok) == "recovered"
+    assert breaker.state is CircuitState.CLOSED

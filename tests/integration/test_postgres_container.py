@@ -11,6 +11,7 @@ transactions).
 
 from __future__ import annotations
 
+import asyncio
 import uuid
 from collections.abc import AsyncIterator
 
@@ -27,7 +28,8 @@ from krossdb.core.enums import DatabaseKind, RoutingRole
 from krossdb.core.exception_mapper import translate_exceptions
 from krossdb.core.exceptions import DuplicateRecordError, RecordNotFoundError
 from krossdb.events.outbox import SQLAlchemyOutboxStore
-from krossdb.interfaces.events import DomainEvent
+from krossdb.events.relay import OutboxRelay
+from krossdb.interfaces.events import DomainEvent, OutboxRecord
 from krossdb.models.base import Entity
 from krossdb.repositories.relational_repository import SQLAlchemyRepository
 from krossdb.uow.sqlalchemy_uow import SQLAlchemyUnitOfWork
@@ -49,6 +51,18 @@ _widgets_table = Table(
 
 _outbox_table = Table(
     "outbox_pg_it",
+    _metadata,
+    Column("id", String, primary_key=True),
+    Column("event_type", String, nullable=False),
+    Column("payload", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), nullable=False),
+    Column("published_at", DateTime(timezone=True), nullable=True),
+    Column("attempts", Integer, nullable=False),
+)
+
+# Separate from _outbox_table: other tests leave unpublished rows there.
+_relay_outbox_table = Table(
+    "outbox_relay_pg_it",
     _metadata,
     Column("id", String, primary_key=True),
     Column("event_type", String, nullable=False),
@@ -230,3 +244,35 @@ async def test_uow_outbox_event_and_business_row_roll_back_atomically(
             select(_outbox_table).where(_outbox_table.c.id == str(event.event_id))
         )).all()
     assert rows == []
+
+
+async def test_concurrent_relays_publish_disjoint_batches(pg_adapter: PostgresAdapter) -> None:
+    store = SQLAlchemyOutboxStore(pg_adapter, _relay_outbox_table)
+    async with pg_adapter.acquire() as session:
+        await session.execute(_relay_outbox_table.delete())
+    await store.save([OutboxRecord(event_type="WidgetCreated", payload={"i": i}) for i in range(6)])
+
+    first_claimed = asyncio.Event()
+    release_first = asyncio.Event()
+    published_a: list[int] = []
+    published_b: list[int] = []
+
+    async def publish_a(record: OutboxRecord) -> None:
+        published_a.append(record.payload["i"])
+        first_claimed.set()
+        await release_first.wait()
+
+    async def publish_b(record: OutboxRecord) -> None:
+        published_b.append(record.payload["i"])
+
+    relay_a = asyncio.create_task(OutboxRelay(store, publish_a, batch_size=3).run_once())
+    await asyncio.wait_for(first_claimed.wait(), timeout=10)
+    # Relay A still holds its batch's row locks. Without SKIP LOCKED, B would
+    # either block on them (timing out here) or publish the same records.
+    await asyncio.wait_for(OutboxRelay(store, publish_b, batch_size=3).run_once(), timeout=10)
+    release_first.set()
+    await asyncio.wait_for(relay_a, timeout=10)
+
+    assert not set(published_a) & set(published_b)
+    assert sorted(published_a + published_b) == list(range(6))
+    assert await store.fetch_unpublished() == []

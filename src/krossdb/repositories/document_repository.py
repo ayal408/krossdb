@@ -108,9 +108,15 @@ class MongoDBRepository(AbstractRepository[TModel, TId]):
         return entity.model_dump(mode="json")
 
     async def get_by_id(self, id_: TId) -> TModel | None:
-        async with self.adapter.acquire() as db:
-            with translate_exceptions(collection=self.collection_name, op="get_by_id"):
-                doc = await db[self.collection_name].find_one({self.id_field: str(id_)})
+        async def _read() -> Mapping[str, Any] | None:
+            async with self.adapter.acquire() as db:
+                with translate_exceptions(collection=self.collection_name, op="get_by_id"):
+                    doc: Mapping[str, Any] | None = await db[self.collection_name].find_one(
+                        {self.id_field: str(id_)}
+                    )
+                    return doc
+
+        doc = await self.adapter.run_read(_read, operation_name=f"{self.collection_name}.get_by_id")
         return self._doc_to_model(doc) if doc else None
 
     async def create(self, entity: TModel, *, idempotency_key: str | None = None) -> TModel:
@@ -164,25 +170,33 @@ class MongoDBRepository(AbstractRepository[TModel, TId]):
         sort: Sequence[SortSpec] | None = None,
     ) -> Page[TModel]:
         query = _criteria_to_query(criteria)
-        async with self.adapter.acquire() as db:
-            collection = db[self.collection_name]
-            with translate_exceptions(collection=self.collection_name, op="find"):
-                total = await collection.count_documents(query)
-                cursor = collection.find(query).skip(offset).limit(limit)
-                if sort:
-                    cursor = cursor.sort(
-                        [(s.field, DESCENDING if s.descending else ASCENDING) for s in sort]
-                    )
-                docs = [doc async for doc in cursor]
+
+        async def _read() -> tuple[int, list[Mapping[str, Any]]]:
+            async with self.adapter.acquire() as db:
+                collection = db[self.collection_name]
+                with translate_exceptions(collection=self.collection_name, op="find"):
+                    total: int = await collection.count_documents(query)
+                    cursor = collection.find(query).skip(offset).limit(limit)
+                    if sort:
+                        cursor = cursor.sort(
+                            [(s.field, DESCENDING if s.descending else ASCENDING) for s in sort]
+                        )
+                    return total, [doc async for doc in cursor]
+
+        total, docs = await self.adapter.run_read(_read, operation_name=f"{self.collection_name}.find")
         return Page(
             items=[self._doc_to_model(doc) for doc in docs], total=total, limit=limit, offset=offset
         )
 
     async def count(self, criteria: Mapping[str, Any] | Specification | None = None) -> int:
         query = _criteria_to_query(criteria)
-        async with self.adapter.acquire() as db:
-            with translate_exceptions(collection=self.collection_name, op="count"):
-                return await db[self.collection_name].count_documents(query)
+
+        async def _read() -> int:
+            async with self.adapter.acquire() as db:
+                with translate_exceptions(collection=self.collection_name, op="count"):
+                    return int(await db[self.collection_name].count_documents(query))
+
+        return await self.adapter.run_read(_read, operation_name=f"{self.collection_name}.count")
 
     async def bulk_create(
         self, entities: Sequence[TModel], *, idempotency_key: str | None = None

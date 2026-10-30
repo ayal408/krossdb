@@ -22,7 +22,7 @@ from krossdb.core.exception_mapper import translate_exceptions
 from krossdb.core.exceptions import ConfigurationError
 from krossdb.factory.db_factory import register_adapter
 from krossdb.interfaces.adapter import AbstractDatabaseAdapter, HealthCheckResult
-from krossdb.resilience.circuit_breaker import CircuitBreaker
+from krossdb.resilience.circuit_breaker import INFRASTRUCTURE_FAILURES, CircuitBreaker
 from krossdb.resilience.retry import with_retry
 
 
@@ -73,8 +73,9 @@ class MongoDBAdapter(AbstractDatabaseAdapter[AsyncIOMotorDatabase[dict[str, Any]
     async def acquire(self, *, role: RoutingRole = RoutingRole.MASTER) -> AsyncIterator[AsyncIOMotorDatabase[dict[str, Any]]]:
         if self._database is None:
             raise ConfigurationError(f"connection {self.config.name!r} is not connected")
-        with translate_exceptions(adapter=str(self.kind), connection=self.config.name):
-            yield self._database
+        async with self._breaker.guard(failure_types=INFRASTRUCTURE_FAILURES):
+            with translate_exceptions(adapter=str(self.kind), connection=self.config.name):
+                yield self._database
 
     async def health_check(self) -> HealthCheckResult:
         start = time.monotonic()

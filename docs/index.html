@@ -394,7 +394,7 @@
       <div class="feature-card">
         <span class="tag">Resilience</span>
         <h3>Circuit breaker + backoff</h3>
-        <p>Exponential-backoff retry and a per-node circuit breaker guard connection setup and health checks, tuned per connection.</p>
+        <p>Every query runs under a per-node circuit breaker that only counts infrastructure failures, so a duplicate key never trips it. Reads retry with exponential backoff, and fall back from an open replica to the master. Writes are never retried.</p>
       </div>
       <div class="feature-card">
         <span class="tag">Multi-tenancy</span>
@@ -409,7 +409,7 @@
       <div class="feature-card">
         <span class="tag">Events</span>
         <h3>Dispatcher + outbox</h3>
-        <p>An in-process event dispatcher and a transactional outbox — in-memory or SQL table-backed. When a Unit of Work is given an outbox store, the domain events it raises are written to the outbox in the same transaction as the business data, so both commit or roll back together.</p>
+        <p>An in-process dispatcher and a transactional outbox (in-memory or SQL). Given an outbox store, a Unit of Work commits or rolls back its events together with the business data; <code class="inline">OutboxRelay</code> then delivers them at-least-once, and claims batches with <code class="inline">SKIP LOCKED</code> so several relays can run side by side.</p>
       </div>
       <div class="feature-card">
         <span class="tag">Observability</span>
@@ -508,7 +508,7 @@ config = ConnectionConfig(
   <section>
     <div class="section-head">
       <span class="eyebrow">Testing</span>
-      <h2>320 tests, ~90% coverage</h2>
+      <h2>360 tests, 90%+ coverage</h2>
       <p>Integration tests spin up real Postgres/MongoDB/Qdrant via Testcontainers and are
         skipped automatically when Docker isn't reachable — <code class="inline">pytest -m unit</code>
         never fails because of them.</p>
