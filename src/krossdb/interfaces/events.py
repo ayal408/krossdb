@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import uuid
 from abc import ABC, abstractmethod
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Any
 
@@ -51,19 +52,42 @@ class OutboxRecord(BaseModel):
 class AbstractOutboxStore(ABC):
     """Durable storage for events written in the same transaction as the business data.
 
-    A background relay (not part of this ABC) polls :meth:`fetch_unpublished`
-    and calls :meth:`mark_published`, giving at-least-once delivery to the
-    :class:`AbstractEventDispatcher` without a distributed transaction / 2PC.
+    :class:`~krossdb.events.relay.OutboxRelay` drains it: inside :meth:`claim`
+    it calls :meth:`fetch_unpublished`, publishes each record, then calls
+    :meth:`mark_published` / :meth:`record_failed_attempts`. That gives
+    at-least-once delivery without a distributed transaction / 2PC.
     """
 
     @abstractmethod
     async def save(self, records: list[OutboxRecord]) -> None: ...
 
     @abstractmethod
-    async def fetch_unpublished(self, *, limit: int = 100) -> list[OutboxRecord]: ...
+    async def fetch_unpublished(
+        self, *, limit: int = 100, max_attempts: int | None = None
+    ) -> list[OutboxRecord]:
+        """Oldest unpublished records first, skipping any with ``attempts >= max_attempts``."""
 
     @abstractmethod
     async def mark_published(self, record_ids: list[uuid.UUID]) -> None: ...
+
+    async def record_failed_attempts(self, record_ids: list[uuid.UUID]) -> None:
+        """Increment ``attempts`` for records whose publish failed."""
+
+        raise NotImplementedError(
+            f"{type(self).__name__} does not track failed publish attempts; "
+            "override record_failed_attempts() to use it with OutboxRelay"
+        )
+
+    @asynccontextmanager
+    async def claim(self) -> AsyncIterator[None]:
+        """Scope for one relay batch: fetch, publish, and mark.
+
+        Stores that can lock rows override this so concurrent relays never
+        pick up the same records. The default does no locking, which is only
+        safe with a single relay.
+        """
+
+        yield
 
 
 class AbstractEventDispatcher(ABC):

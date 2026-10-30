@@ -15,9 +15,11 @@ class InMemoryEventDispatcher(AbstractEventDispatcher):
 
     A handler's exception is logged and swallowed rather than propagated, so
     one misbehaving subscriber can't break the publisher or other
-    subscribers. For at-least-once delivery across process restarts, pair
-    this with the outbox relay (see :mod:`krossdb.events.outbox`) instead of
-    relying on in-process publish alone.
+    subscribers. For at-least-once delivery across process restarts, write
+    events to an outbox store and drain it with
+    :class:`~krossdb.events.relay.OutboxRelay` instead of relying on
+    in-process publish alone (and since this dispatcher swallows handler
+    errors, don't use its ``publish`` as the relay's publisher).
     """
 
     def __init__(self) -> None:
