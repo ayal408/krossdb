@@ -16,7 +16,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 
-from sqlalchemy import Table, select, update
+from sqlalchemy import JSON, Table, select, update
 
 from krossdb.adapters.relational.base import SQLAlchemyAdapter
 from krossdb.core.exception_mapper import translate_exceptions
@@ -82,7 +82,11 @@ class SQLAlchemyOutboxStore(AbstractOutboxStore):
                         self.table.insert().values(
                             id=str(record.id),
                             event_type=record.event_type,
-                            payload=json.dumps(record.payload),
+                            payload=(
+                                record.payload
+                                if isinstance(self.table.c.payload.type, JSON)
+                                else json.dumps(record.payload)
+                            ),
                             created_at=record.created_at,
                             published_at=record.published_at,
                             attempts=record.attempts,
@@ -126,7 +130,11 @@ class SQLAlchemyOutboxStore(AbstractOutboxStore):
             OutboxRecord(
                 id=uuid.UUID(str(row["id"])),
                 event_type=row["event_type"],
-                payload=json.loads(row["payload"]),
+                payload=(
+                    json.loads(row["payload"])
+                    if isinstance(row["payload"], str)
+                    else row["payload"]
+                ),
                 created_at=row["created_at"],
                 published_at=row["published_at"],
                 attempts=row["attempts"],
