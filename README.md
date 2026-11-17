@@ -96,6 +96,14 @@ See [`examples/quickstart.py`](examples/quickstart.py) for a complete, runnable
 version (table creation, CRUD, exception handling, and a transactional Unit
 of Work) — `python examples/quickstart.py` after `pip install -e ".[sqlite]"`.
 
+## Real-world demo
+
+[**krossdb-demo**](https://github.com/ayal408/krossdb-demo) (LedgerFlow) is a small
+multi-client bookkeeping backend built on krossdb. It shows multi-tenancy, Unit of Work,
+the transactional outbox, caching, resilience, querying and declarative schema working
+together, on SQLite or PostgreSQL. A guided tour is live at
+https://apps-ayal408.vercel.app/krossdb.
+
 ## Declarative schema
 
 Tables can also be described in YAML/JSON instead of SQLAlchemy Core code:
