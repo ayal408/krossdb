@@ -1,12 +1,17 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>krossdb</title>
-<link rel="icon" href="data:,">
+<title>krossdb — one repository interface for PostgreSQL, MySQL, SQLite, MongoDB and Qdrant</title>
+<meta name="description" content="krossdb is an async Python library that gives PostgreSQL, MySQL, SQLite, MongoDB and Qdrant the same repository and Unit-of-Work interface, with retries, caching and observability built in.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="krossdb — one repository interface, three kinds of database">
+<meta property="og:description" content="Async Python library: the same repository, Unit-of-Work, exceptions, retries and caching over relational, document and vector databases.">
+<meta name="theme-color" content="#c1701f">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2314181f'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%23e2953f'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700;900&family=Assistant:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
 <style>
   :root {
     --ink: #14181f;
@@ -219,9 +224,74 @@
   @media (prefers-reduced-motion: reduce) {
     .hub-pulse, .pulse-anim { animation: none !important; }
   }
+
+  .skip { position: absolute; left: -9999px; top: 8px; background: var(--accent); color: #fff; padding: 8px 14px; border-radius: 8px; z-index: 100; font-family: var(--font-mono); font-size: 13px; text-decoration: none; }
+  .skip:focus { left: 12px; }
+  a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+  .code-head { gap: 12px; }
+  .copy-btn { font-family: var(--font-mono); font-size: 12px; padding: 3px 10px; border-radius: 6px; border: 1px solid var(--line); background: transparent; color: inherit; cursor: pointer; opacity: .85; }
+  .copy-btn:hover { opacity: 1; border-color: var(--accent); }
+  .install-line { cursor: pointer; }
+  .install-note { font-size: 13px; color: var(--text-dim); margin: 8px 0 0; }
+  @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto !important; } * { animation: none !important; transition: none !important; } }
+
+  /* ---- A4U theme (matches the portfolio) ---- */
+  :root {
+    --ink: #0a332f; --paper: #f3f8f7; --paper-raised: #ffffff; --line: #d3e4e0;
+    --text: #17302d; --text-dim: #4a615d; --text-faint: #7d918d;
+    --accent: #0d6d63; --accent-strong: #0d6d63; --accent-soft: #d9efea;
+    --relational: #14919b; --document: #f59e0b; --vector: #dc2626;
+    --code-bg: #0a332f; --code-text: #e8f3f1;
+    --shadow: 0 1px 2px rgba(10, 51, 47, 0.06), 0 10px 28px rgba(10, 51, 47, 0.08);
+    --font-display: 'Frank Ruhl Libre', Georgia, serif;
+    --font-body: 'Assistant', 'Segoe UI', sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ink: #06201d; --paper: #0a1f1d; --paper-raised: #10312e; --line: #1d4a45;
+      --text: #e8f3f1; --text-dim: #a9c4bf; --text-faint: #7d9d98;
+      --accent: #14919b; --accent-strong: #5fd0c4; --accent-soft: #123f3b;
+      --relational: #5fd0c4; --document: #fbbf24; --vector: #fb7185;
+      --code-bg: #06201d; --code-text: #e8f3f1;
+    }
+  }
+  h1, h2, h3 { font-weight: 700; letter-spacing: 0; }
+  .hero h1 { font-weight: 900; line-height: 1.15; }
+  .hero {
+    margin-top: 22px; padding: 52px 44px; border-radius: 22px; border-top: none;
+    background: radial-gradient(circle at 20% 15%, rgba(245, 158, 11, 0.18), transparent 55%), linear-gradient(135deg, #0d6d63 0%, #0a332f 100%);
+    color: #fff; box-shadow: 0 20px 50px -22px rgba(10, 51, 47, 0.6);
+  }
+  .hero h1 .hl { color: #ffd479; }
+  .hero p.lead { color: rgba(255, 255, 255, 0.92); }
+  .hero .eyebrow { background: rgba(255, 255, 255, 0.12); color: #ffd479; }
+  .hero .btn { border-radius: 999px; }
+  .hero .btn-primary { background: #fff; color: #0d6d63; }
+  .hero .btn-primary:hover { background: #ffd479; color: #0a332f; }
+  .hero .btn-ghost { border: 1px solid rgba(255, 255, 255, 0.55); color: #fff !important; }
+  .hero .btn-ghost:hover { border-color: #ffd479; background: rgba(255, 255, 255, 0.08); }
+  .hero .install-line { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.25); color: #fff; }
+  .hero .install-line .prompt { color: #ffd479; }
+  .hero .install-note { color: rgba(255, 255, 255, 0.78); }
+  .hero .install-note .inline { background: rgba(255, 255, 255, 0.14); color: #fff; }
+  .hero .hub-figure { --relational: #7fe0d4; --document: #ffd479; --vector: #ff9b9b; }
+  .hero .hub-label { fill: #fff; }
+  .hero .hub-sub { fill: rgba(255, 255, 255, 0.72); }
+  .hero .hub-edge { stroke: rgba(255, 255, 255, 0.38); }
+  .hero .hub-node rect { fill: #ffd479; }
+  .hero .hub-core-label { fill: #0a332f; }
+  .btn { border-radius: 999px; }
+  .btn-primary { color: #fff; background: linear-gradient(135deg, #0d6d63, #14919b); }
+  .btn-primary:hover { background: linear-gradient(135deg, #0a5a52, #0d6d63); }
+  .nav-cta { border-radius: 999px; }
+  .why-card, .feature-card, .test-card, .table-wrap, .code-panel, .tree-panel { border-radius: 16px; }
+  .feature-card:hover, .why-card:hover { box-shadow: var(--shadow); }
+  @media (max-width: 760px) { .hero { padding: 32px 22px; } }
 </style>
 </head>
 <body>
+<a class="skip" href="#why">Skip to content</a>
 
 <nav class="nav">
   <div class="wrap">
@@ -232,6 +302,8 @@
       <a href="#features">Features</a>
       <a href="#quickstart">Quickstart</a>
       <a href="#adapters">Adapters</a>
+      <a href="https://apps-ayal408.vercel.app/krossdb">Live demo</a>
+      <a href="https://pypi.org/project/krossdb/" target="_blank" rel="noopener">PyPI ↗</a>
       <a class="nav-cta" href="https://github.com/ayal408/krossdb" target="_blank" rel="noopener">GitHub ↗</a>
     </div>
   </div>
@@ -249,9 +321,11 @@
           abstraction, not a driver.</p>
         <div class="hero-actions">
           <a class="btn btn-primary" href="#quickstart">See the quickstart →</a>
+          <a class="btn btn-ghost" href="https://apps-ayal408.vercel.app/krossdb">Try the live demo</a>
           <a class="btn btn-ghost" href="https://github.com/ayal408/krossdb" target="_blank" rel="noopener">View source</a>
         </div>
-        <div class="install-line"><span class="prompt">$</span> pip install -e ".[dev]"</div>
+        <div class="install-line" id="install" title="Click to copy"><span class="prompt">$</span> pip install "krossdb[postgres,mongodb,vector]"</div>
+        <p class="install-note">Pick the extras you need: <code class="inline">postgres</code>, <code class="inline">mysql</code>, <code class="inline">sqlite</code>, <code class="inline">mongodb</code>, <code class="inline">vector</code>, <code class="inline">cache</code>. Python 3.11 or newer.</p>
       </div>
       <div>
         <svg class="hub-figure" viewBox="0 0 420 320" role="img" aria-label="A central krossdb adapter connecting to relational, document, and vector databases">
@@ -547,5 +621,23 @@ config = ConnectionConfig(
     </div>
   </footer>
 </div>
+<script>
+(function () {
+  function copy(text, btn) {
+    var done = function () { if (btn) { var t = btn.textContent; btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = t; }, 1400); } };
+    if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(text).then(done, done); }
+    else { var a = document.createElement('textarea'); a.value = text; document.body.appendChild(a); a.select(); try { document.execCommand('copy'); } catch (e) {} document.body.removeChild(a); done(); }
+  }
+  document.querySelectorAll('.code-panel').forEach(function (panel) {
+    var head = panel.querySelector('.code-head'), pre = panel.querySelector('pre');
+    if (!head || !pre) return;
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'copy-btn'; b.textContent = 'Copy'; b.setAttribute('aria-label', 'Copy code');
+    b.addEventListener('click', function () { copy(pre.innerText, b); });
+    head.appendChild(b);
+  });
+  var inst = document.getElementById('install');
+  if (inst) inst.addEventListener('click', function () { copy(inst.innerText.replace(/^\$\s*/, ''), null); });
+})();
+</script>
 </body>
 </html>
