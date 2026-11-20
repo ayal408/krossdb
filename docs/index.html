@@ -9,7 +9,7 @@
 <meta property="og:title" content="krossdb — one repository interface, three kinds of database">
 <meta property="og:description" content="Async Python library: the same repository, Unit-of-Work, exceptions, retries and caching over relational, document and vector databases.">
 <meta name="theme-color" content="#c1701f">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2314181f'/%3E%3Ccircle cx='16' cy='16' r='7' fill='%23e2953f'/%3E%3C/svg%3E">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%230F4C5C'/%3E%3Cstop offset='1' stop-color='%232A7D8F'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='16' fill='url(%23g)'/%3E%3Cpath d='M19 47V17h7v12l11-12h9L34 31l13 16h-9L26 35v12Z' fill='%23fff'/%3E%3Ccircle cx='49' cy='15' r='7' fill='%23E09F3E' stroke='%23fff' stroke-width='3'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@500;700;900&family=Assistant:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap">
 <style>
@@ -300,7 +300,10 @@
       <a href="#why">Why</a>
       <a href="#architecture">Architecture</a>
       <a href="#features">Features</a>
+      <a href="#install">Install</a>
       <a href="#quickstart">Quickstart</a>
+      <a href="#schema">Schema</a>
+      <a href="#cli">CLI</a>
       <a href="#adapters">Adapters</a>
       <a href="https://apps-ayal408.vercel.app/krossdb">Live demo</a>
       <a href="https://pypi.org/project/krossdb/" target="_blank" rel="noopener">PyPI ↗</a>
@@ -508,6 +511,29 @@
     </div>
   </section>
 
+  <section id="install">
+    <div class="section-head">
+      <span class="eyebrow">Install</span>
+      <h2>From PyPI, with only the drivers you need</h2>
+      <p>The core has no database driver of its own. Add an extra for each backend you use; the Python package you
+        <code class="inline">import</code> is <code class="inline">krossdb</code>.</p>
+    </div>
+    <div class="code-panel">
+      <div class="code-head"><span>shell</span><span>Python 3.11+</span></div>
+      <pre><span class="tok-com"># core only</span>
+pip install krossdb
+
+<span class="tok-com"># one or more backends</span>
+pip install "krossdb[postgres]"            <span class="tok-com"># asyncpg</span>
+pip install "krossdb[mysql,sqlite]"
+pip install "krossdb[mongodb,vector]"      <span class="tok-com"># MongoDB (Motor) and Qdrant</span>
+pip install "krossdb[cache,migrations]"    <span class="tok-com"># Redis cache-aside, Alembic wiring</span>
+
+<span class="tok-com"># everything</span>
+pip install "krossdb[all]"</pre>
+    </div>
+  </section>
+
   <section id="quickstart">
     <div class="section-head">
       <span class="eyebrow">Quickstart</span>
@@ -517,7 +543,10 @@
     </div>
     <div class="code-panel">
       <div class="code-head"><span>quickstart.py</span><span>python examples/quickstart.py</span></div>
-      <pre><span class="tok-kw">class</span> <span class="tok-cls">Widget</span>(Entity):
+      <pre><span class="tok-kw">from</span> krossdb <span class="tok-kw">import</span> ConnectionConfig, DatabaseFactory, DatabaseKind, Entity, NodeConfig, RoutingRole
+<span class="tok-kw">from</span> krossdb.repositories.relational_repository <span class="tok-kw">import</span> SQLAlchemyRepository
+
+<span class="tok-kw">class</span> <span class="tok-cls">Widget</span>(Entity):
     name: <span class="tok-cls">str</span>
     quantity: <span class="tok-cls">int</span> = <span class="tok-str">0</span>
 
@@ -540,6 +569,53 @@ config = ConnectionConfig(
         <span class="tok-kw">await</span> repo.<span class="tok-fn">create</span>(Widget(name=<span class="tok-str">"widget-b"</span>, quantity=<span class="tok-str">2</span>))
         <span class="tok-kw">await</span> uow.<span class="tok-fn">commit</span>()</pre>
     </div>
+  </section>
+
+  <section id="schema">
+    <div class="section-head">
+      <span class="eyebrow">Schema</span>
+      <h2>Describe tables in YAML, get correct DDL everywhere</h2>
+      <p>Instead of SQLAlchemy Core code, a table can be described in YAML or JSON.
+        <code class="inline">krossdb.schema.build_metadata</code> turns it into a real
+        <code class="inline">MetaData</code>, so the same file produces correct DDL on PostgreSQL, MySQL and SQLite.</p>
+    </div>
+    <div class="code-panel">
+      <div class="code-head"><span>schema.yaml</span><span>krossdb schema create --schema schema.yaml</span></div>
+      <pre>tables:
+  - name: widgets
+    columns:
+      - name: id
+        type: uuid
+        primary_key: true
+      - name: name
+        type: string
+        required: true
+        unique: true
+      - name: quantity
+        type: integer
+        required: true</pre>
+    </div>
+  </section>
+
+  <section id="cli">
+    <div class="section-head">
+      <span class="eyebrow">CLI</span>
+      <h2>A small console script for the day-to-day</h2>
+      <p>Installed with the package. Day-to-day migration work still goes through Alembic's own CLI; krossdb only wires it
+        to your configuration.</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Command</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td class="fam"><code class="inline">krossdb init</code></td><td>Scaffold a starter <code class="inline">krossdb.yaml</code>.</td></tr>
+          <tr><td class="fam"><code class="inline">krossdb health</code></td><td>Connect to every configured database and report its status.</td></tr>
+          <tr><td class="fam"><code class="inline">krossdb schema create</code></td><td>Create the tables from a YAML schema or a <code class="inline">MetaData</code> object, on a configured connection.</td></tr>
+          <tr><td class="fam"><code class="inline">krossdb schema init-migrations</code></td><td>Scaffold an Alembic project that reads the database URL and target metadata from <code class="inline">krossdb.yaml</code> (needs the <code class="inline">migrations</code> extra).</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="install-note" style="margin-top:14px">Reads go through a per-node circuit breaker and are retried with exponential backoff; writes are never retried, and nothing is retried inside a Unit of Work.</p>
   </section>
 
   <section id="adapters">
